@@ -672,6 +672,7 @@ void scenario_decrypt_message_seed() {
     }
 
     switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new(&r, buf_seed_2, mode);
     {
       profiler_t p;
       for (int i = 0; i < actual_message_length; i++) {
@@ -682,12 +683,42 @@ void scenario_decrypt_message_seed() {
     for (int i = 0; i < repeat; i++) {
       benchmark_decrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
       rng_reset_indices(&r);
-      
+
       for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
     }
+}
+
+void scenario_fill_rnd_table_aes() {
+  // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
+  if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN) {
+      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
+      return;
+  }
+
+  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+  rng_new(&r, buf_seed_2, mode);
+
+  for (int i = 0; i < MAX_MESSAGE_SIZE; i++) {
+    precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
+  }
+}
+
+void scenario_fill_rnd_table_arduino() {
+  // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
+  if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN) {
+      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
+      return;
+  }
+
+  randomSeed(*buf_seed_1); // TODO: change
+
+  uint8_t* buf_random_values_byte = (uint8_t*) buf_random_values; 
+  for (int i = 0; i < sizeof(buf_random_values); i++) {
+    buf_random_values_byte[i] = random(256);
+  }
 }
 
 void setup() {
@@ -760,9 +791,12 @@ void process_input() {
     } else if (choice == "9") {
       // Benchmark complete decryption, full message
       scenario_decrypt_message_seed();
-    } else if (choice == "genRnd") {
-      // Fill a table with random values for faster subsequent lookups.
-      //scenario_fill_rnd_table();
+    } else if (choice == "genRndAES") {
+      // Fill a table with random values for faster subsequent lookups with AES.
+      scenario_fill_rnd_table_aes();
+    } else if (choice == "genRndArduino") {
+      // Fill a table with random values for faster subsequent lookups with the built-in random function.
+      scenario_fill_rnd_table_arduino();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
     }
