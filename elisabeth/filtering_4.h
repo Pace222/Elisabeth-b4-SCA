@@ -8,6 +8,6 @@
 #define KEYROUND_WIDTH_4 60
 
 void init_sboxes_4();
-uint4_t filter_block_4(uint4_t*);
+uint4_t filter_block_4(const uint4_t*);
 
 #endif

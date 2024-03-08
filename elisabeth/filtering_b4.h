@@ -8,6 +8,6 @@
 #define KEYROUND_WIDTH_B4 98
 
 void init_sboxes_b4();
-uint4_t filter_block_b4(uint4_t*);
+uint4_t filter_block_b4(const uint4_t*);
 
 #endif

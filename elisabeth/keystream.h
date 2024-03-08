@@ -10,8 +10,8 @@
 #include "filtering_b4.h"
 
 
-void random_whitened_subset(uint4_t*, uint4_t*, rng*, uint32_t*);
-uint4_t filter(uint4_t*, int);
+void random_whitened_subset(uint4_t*, const uint4_t*, rng*, const uint32_t*);
+uint4_t filter(const uint4_t*, int);
 /*uint4_t filter_par(uint4_t*);*/
 
 #endif

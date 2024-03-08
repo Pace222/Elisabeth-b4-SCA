@@ -1,6 +1,6 @@
 #include "encryption.h"
 
-void encrypt(uint4_t* ciphertext, uint4_t* plaintext, uint4_t* key, rng* r, size_t length, uint32_t* precomputed_random_values) {
+void encrypt(uint4_t* ciphertext, const uint4_t* plaintext, const uint4_t* key, const rng* r, size_t length, const uint32_t* precomputed_random_values) {
     int KEYROUND_WIDTH = r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
     uint4_t filtered_key;
     for (int i = 0; i < length; i++) {
@@ -11,7 +11,7 @@ void encrypt(uint4_t* ciphertext, uint4_t* plaintext, uint4_t* key, rng* r, size
     }
 }
 
-void decrypt(uint4_t* decrypted, uint4_t* ciphertext, uint4_t* key, rng* r, size_t length, uint32_t* precomputed_random_values) {
+void decrypt(uint4_t* decrypted, const uint4_t* ciphertext, const uint4_t* key, const rng* r, size_t length, const uint32_t* precomputed_random_values) {
     int KEYROUND_WIDTH = r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
     for (int i = 0; i < length; i++) {
         uint4_t keyround[KEYROUND_WIDTH];

@@ -1,26 +1,25 @@
 #include "keystream.h"
 
 
-void random_whitened_subset(uint4_t* keyround, uint4_t* key, rng* r, uint32_t* precomputed_random_values) {
+void random_whitened_subset(uint4_t* keyround, const uint4_t* key, rng* r, const uint32_t* precomputed_random_values) {
     int KEYROUND_WIDTH = r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
     int KEY_WIDTH = r->mode ? KEY_WIDTH_4 : KEY_WIDTH_B4;
-    size_t* indices = r->mode ? r->indices._4 : r->indices._b4;
 
     // Select a random subset without repetition of size KEYROUND_WIDTH from the key
     for (int i = 0; i < KEYROUND_WIDTH; i++) {
         uint32_t j = precomputed_random_values[i];
-        size_t tmp = indices[i];
-        indices[i] = indices[j];
-        indices[j] = tmp;
+        size_t tmp = r->indices[i];
+        r->indices[i] = r->indices[j];
+        r->indices[j] = tmp;
     }
 
     // Apply the whitening mask to the selected subset
     for (int i = 0; i < KEYROUND_WIDTH; i++) {
-        keyround[i] = uint4_add(key[indices[i]], precomputed_random_values[KEYROUND_WIDTH + i]);
+        keyround[i] = uint4_add(key[r->indices[i]], precomputed_random_values[KEYROUND_WIDTH + i]);
     }
 }
 
-uint4_t filter(uint4_t* keyround, int mode) {
+uint4_t filter(const uint4_t* keyround, int mode) {
     int KEYROUND_WIDTH = mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
     int BLOCK_WIDTH = mode ? BLOCK_WIDTH_4 : BLOCK_WIDTH_B4;
     uint4_t (*filter_block) (uint4_t*) = mode ? filter_block_4 : filter_block_b4;

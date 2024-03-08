@@ -31,18 +31,22 @@ void generate_batch(rng* r) {
     r->batch_idx = 0;
 }
 
-void rng_new(rng* r, uint8_t* seed_little_end, int mode) {
+void rng_reset_indices(rng* r) {
+    int KEY_WIDTH = (r->mode ? KEY_WIDTH_4 : KEY_WIDTH_B4);
+    for (int i = 0; i < KEY_WIDTH; i++) {
+        r->indices[i] = i;
+    }
+}
+
+void rng_new(rng* r, const uint8_t* seed_little_end, int mode) {
     int KEY_WIDTH = (mode ? KEY_WIDTH_4 : KEY_WIDTH_B4);
-    size_t* indices = (mode ? r->indices._4 : r->indices._b4);
 
     AES_init_ctx(&r->ctx, seed_little_end);
     memset(r->ctr, 0, AES_BLOCKLEN);
     generate_batch(r);
 
     r->mode = mode;
-    for (int i = 0; i < KEY_WIDTH; i++) {
-        indices[i] = i;
-    }
+    rng_reset_indices(r);
 }
 
 uint8_t random_uniform(rng* r) {

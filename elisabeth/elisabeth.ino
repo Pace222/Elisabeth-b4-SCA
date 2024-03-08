@@ -25,7 +25,7 @@ void benchmark_whitening(uint4_t* keyround, uint4_t* key, rng* r, uint32_t* prec
 }
 
 void benchmark_filter_block(uint4_t* filter_el, uint4_t* block, int mode) {
-  uint4_t (*filter_block) (uint4_t*) = mode ? filter_block_4 : filter_block_b4;
+  uint4_t (*filter_block) (const uint4_t*) = mode ? filter_block_4 : filter_block_b4;
 
   noInterrupts();
   //Run the trigger Low to High
@@ -365,15 +365,17 @@ void print_format(int mode, String choice, String arguments, String description)
     str_to_print += "[4 | B4]" + String(DELIMITER);
   }
 
+  str_to_print += "[0-9]" + String(DELIMITER);
+
   if (choice != "\0") {
     str_to_print += "[" + choice + "]" + String(DELIMITER);
   } else {
-    str_to_print += "[0-9]" + String(DELIMITER);
+    str_to_print += "[CHOICE]" + String(DELIMITER);
   }
 
-  str_to_print += arguments + "> | " + description;
+  str_to_print += arguments + "> | Elisabeth-4/b4 | Number of repetitions | Scenario | " + description;
 
-  str_to_print += " All arguments must be in hexadecimal format.";
+  str_to_print += " All arguments must be in hexadecimal format, except for the number of repetitions which is in decimal.";
 
   Serial.println(str_to_print);
 
@@ -437,8 +439,8 @@ uint32_t buf_random_values[MAX_MESSAGE_SIZE * 2 * KEYROUND_WIDTH_B4];
 
 int BLOCK_WIDTH, KEYROUND_WIDTH, KEY_WIDTH;
 
-String mode_str, choice;
-int mode;
+String mode_str, repeat_str, choice;
+int mode, repeat;
 int actual_message_length;
 
 int setup_mode() {
@@ -461,14 +463,31 @@ int setup_mode() {
     }
 }
 
-int setup_choice() {
-    choice = read_until(DELIMITER);
-    if (choice.length() <= 0) {
+int setup_repeat() {
+    repeat_str = read_until(DELIMITER);
+    repeat = repeat_str.toInt();
+    if (repeat <= 0) {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
       return 1;
     }
     
     return 0;
+}
+
+int setup_choice() {
+    choice = read_until(DELIMITER);
+    if (choice.length() == 0) {
+      print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
+      return 1;
+    }
+    
+    return 0;
+}
+
+void setup_rng_and_precompute(uint8_t* seed_little_end, const uint8_t* seed_big_end) {
+    switch_endianness(seed_little_end, seed_big_end, AES_KEYLEN);
+    rng_new(&r, seed_little_end, mode);
+    precompute_prng(buf_random_values, &r);
 }
 
 void scenario_whitening_seed() {
@@ -478,13 +497,17 @@ void scenario_whitening_seed() {
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    precompute_prng(buf_random_values, &r);
+    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
 
-    benchmark_whitening(buf_out, buf_arg, &r, buf_random_values);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_whitening(buf_out, buf_arg, &r, buf_random_values);
+      rng_reset_indices(&r);
 
-    for (int i = 0; i < KEYROUND_WIDTH; i++) Serial.print(((char*) buf_out)[i], HEX);
+      for (int i = 0; i < KEYROUND_WIDTH; i++) Serial.print(((char*) buf_out)[i], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_filter_block() {
@@ -494,9 +517,14 @@ void scenario_filter_block() {
         return;
     }
 
-    benchmark_filter_block(buf_out, buf_arg, mode);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_filter_block(buf_out, buf_arg, mode);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_filter() {
@@ -506,9 +534,14 @@ void scenario_filter() {
         return;
     }
 
-    benchmark_filter(buf_out, buf_arg, mode);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_filter(buf_out, buf_arg, mode);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_whitening_and_filter() {
@@ -518,13 +551,17 @@ void scenario_whitening_and_filter() {
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    precompute_prng(buf_random_values, &r);
+    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
 
-    benchmark_whitening_and_filter(buf_out, buf_arg, &r, buf_random_values);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_whitening_and_filter(buf_out, buf_arg, &r, buf_random_values);
+      rng_reset_indices(&r);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_addition() {
@@ -534,9 +571,14 @@ void scenario_addition() {
         return;
     }
 
-    benchmark_addition(buf_out, buf_message[0], buf_arg[0]);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_addition(buf_out, buf_message[0], buf_arg[0]);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_subtraction() {
@@ -546,9 +588,14 @@ void scenario_subtraction() {
         return;
     }
 
-    benchmark_subtraction(buf_out, buf_message[0], buf_arg[0]);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_subtraction(buf_out, buf_message[0], buf_arg[0]);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_encrypt_elem_seed() {
@@ -558,13 +605,17 @@ void scenario_encrypt_elem_seed() {
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    precompute_prng(buf_random_values, &r);
+    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
 
-    benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
+      rng_reset_indices(&r);
 
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_decrypt_elem_seed() {
@@ -574,13 +625,16 @@ void scenario_decrypt_elem_seed() {
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    precompute_prng(buf_random_values, &r);
+    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
+      rng_reset_indices(&r);
 
-    benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
-
-    Serial.print(buf_out[0], HEX);
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_encrypt_message_seed() {
@@ -592,17 +646,22 @@ void scenario_encrypt_message_seed() {
 
     switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
     rng_new(&r, buf_seed_2, mode);
-    for (int i = 0; i < actual_message_length; i++) {
-      precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
-    }
-
     {
-        profiler_t p;
-        encrypt(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
-        for (int i = 0; i < AES_BLOCKLEN; i++) Serial.print(r.ctr[i], HEX);
+      profiler_t p;
+      for (int i = 0; i < actual_message_length; i++) {
+        precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
+      }
     }
 
-    for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_encrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
+      rng_reset_indices(&r);
+
+      for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void scenario_decrypt_message_seed() {
@@ -613,14 +672,22 @@ void scenario_decrypt_message_seed() {
     }
 
     switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    for (int i = 0; i < actual_message_length; i++) {
-      precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
+    {
+      profiler_t p;
+      for (int i = 0; i < actual_message_length; i++) {
+        precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
+      }
     }
 
-    benchmark_decrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
-
-    for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
+    for (int i = 0; i < repeat; i++) {
+      benchmark_decrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
+      rng_reset_indices(&r);
+      
+      for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
 }
 
 void setup() {
@@ -655,6 +722,10 @@ void process_input() {
       return;
     }
     
+    if (setup_repeat()) {
+      return;
+    }
+
     if (setup_choice()) {
       return;
     }

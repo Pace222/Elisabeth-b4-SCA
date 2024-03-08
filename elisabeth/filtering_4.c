@@ -20,7 +20,7 @@ void init_sboxes_4() {
     }
 }
 
-uint4_t filter_block_4(uint4_t* block) {
+uint4_t filter_block_4(const uint4_t* block) {
     uint4_t first_layer_output[BLOCK_WIDTH_4 - 1];
 
     for (int i = 0; i < BLOCK_WIDTH_4 - 1; i++) {
