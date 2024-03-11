@@ -1,3 +1,4 @@
+
 extern "C" {
   #include "encryption.h"
 }
@@ -8,14 +9,14 @@ extern "C" {
 // Define trigger  PIN
 #define TriggerPQ A0
 
-void benchmark_whitening(uint4_t* keyround, uint4_t* key, rng* r, uint32_t* precomputed_random_values) {
+void benchmark_whitening(uint4_t* keyround, uint4_t* key, rng* r) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);  
 
-  random_whitened_subset(keyround, key, r, precomputed_random_values);
+  random_whitened_subset(keyround, key, r);
 
   interrupts();
   //Run the trigger Low to High
@@ -62,7 +63,7 @@ void benchmark_filter(uint4_t* key_el, uint4_t* keyround, int mode) {
   *key_el = res;
 }
 
-void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r, uint32_t* precomputed_random_values) {
+void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
@@ -70,7 +71,7 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r, uint3
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);  
 
-  random_whitened_subset(keyround, key, r, precomputed_random_values);
+  random_whitened_subset(keyround, key, r);
   uint4_t res = filter(keyround, r->mode);
 
   interrupts();
@@ -118,7 +119,7 @@ void benchmark_subtraction(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t key
   *decrypted_el = r;
 }
 
-void benchmark_encrypt_element(uint4_t* cipher_el, uint4_t plain_el, uint4_t* key, rng* r, uint32_t* precomputed_random_values) {
+void benchmark_encrypt_element(uint4_t* cipher_el, uint4_t plain_el, uint4_t* key, rng* r) {
   uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
 
   noInterrupts();
@@ -127,7 +128,7 @@ void benchmark_encrypt_element(uint4_t* cipher_el, uint4_t plain_el, uint4_t* ke
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);
 
-  random_whitened_subset(keyround, key, r, precomputed_random_values);
+  random_whitened_subset(keyround, key, r);
   uint4_t res = uint4_add(plain_el, filter(keyround, r->mode));
 
   interrupts();
@@ -139,7 +140,7 @@ void benchmark_encrypt_element(uint4_t* cipher_el, uint4_t plain_el, uint4_t* ke
   *cipher_el = res;
 }
 
-void benchmark_decrypt_element(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t* key, rng* r, uint32_t* precomputed_random_values) {
+void benchmark_decrypt_element(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t* key, rng* r) {
   uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
 
   noInterrupts();
@@ -148,7 +149,7 @@ void benchmark_decrypt_element(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);
 
-  random_whitened_subset(keyround, key, r, precomputed_random_values);
+  random_whitened_subset(keyround, key, r);
   uint4_t res = uint4_add(cipher_el, uint4_neg(filter(keyround, r->mode)));
 
   interrupts();
@@ -160,14 +161,14 @@ void benchmark_decrypt_element(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t
   *decrypted_el = res;
 }
 
-void benchmark_encrypt_message(uint4_t* ciphertext, uint4_t* plaintext, uint4_t* key, rng* r, size_t length, uint32_t* precomputed_random_values) {
+void benchmark_encrypt_message(uint4_t* ciphertext, uint4_t* plaintext, uint4_t* key, const rng** r, size_t length) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);  
 
-  encrypt(ciphertext, plaintext, key, r, length, precomputed_random_values);
+  encrypt(ciphertext, plaintext, key, r, length);
 
   interrupts();
   //Run the trigger Low to High
@@ -176,14 +177,14 @@ void benchmark_encrypt_message(uint4_t* ciphertext, uint4_t* plaintext, uint4_t*
   digitalWrite(TriggerPQ, HIGH);
 }
 
-void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t* key, rng* r, size_t length, uint32_t* precomputed_random_values) {
+void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t* key, const rng** r, size_t length) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(100);
   digitalWrite(TriggerPQ, HIGH);  
 
-  decrypt(decrypted, ciphertext, key, r, length, precomputed_random_values);
+  decrypt(decrypted, ciphertext, key, r, length);
 
   interrupts();
   //Run the trigger Low to High
@@ -192,7 +193,7 @@ void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t*
   digitalWrite(TriggerPQ, HIGH);
 }
 
-#define MAX_MESSAGE_SIZE 100
+#define MAX_MESSAGE_SIZE 64
 
 #define MAX_INPUT_SIZE AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
 #define START '<'
@@ -434,14 +435,15 @@ void recv_input() {
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
 uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-rng r;
-uint32_t buf_random_values[MAX_MESSAGE_SIZE * 2 * KEYROUND_WIDTH_B4];
+rng_aes r_aes;
+rng_aes rng_aes_list[MAX_MESSAGE_SIZE];
+const rng* rng_list[MAX_MESSAGE_SIZE];
 
 int BLOCK_WIDTH, KEYROUND_WIDTH, KEY_WIDTH;
 
 String mode_str, repeat_str, choice;
 int mode, repeat;
-int actual_message_length;
+size_t actual_message_length;
 
 int setup_mode() {
     mode_str = read_until(DELIMITER);
@@ -484,12 +486,6 @@ int setup_choice() {
     return 0;
 }
 
-void setup_rng_and_precompute(uint8_t* seed_little_end, const uint8_t* seed_big_end) {
-    switch_endianness(seed_little_end, seed_big_end, AES_KEYLEN);
-    rng_new(&r, seed_little_end, mode);
-    precompute_prng(buf_random_values, &r);
-}
-
 void scenario_whitening_seed() {
     // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is the key. Output is the round key.
     if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
@@ -497,11 +493,11 @@ void scenario_whitening_seed() {
         return;
     }
 
-    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_aes(&r_aes, buf_seed_2, mode);
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening(buf_out, buf_arg, &r, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_whitening(buf_out, buf_arg, &r_aes.r);
 
       for (int i = 0; i < KEYROUND_WIDTH; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -551,11 +547,11 @@ void scenario_whitening_and_filter() {
         return;
     }
 
-    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_aes(&r_aes, buf_seed_2, mode);
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening_and_filter(buf_out, buf_arg, &r, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_whitening_and_filter(buf_out, buf_arg, &r_aes.r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -605,11 +601,11 @@ void scenario_encrypt_elem_seed() {
         return;
     }
 
-    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_aes(&r_aes, buf_seed_2, mode);
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &r_aes.r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -625,10 +621,11 @@ void scenario_decrypt_elem_seed() {
         return;
     }
 
-    setup_rng_and_precompute(buf_seed_2, buf_seed_1);
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_aes(&r_aes, buf_seed_2, mode);
+
     for (int i = 0; i < repeat; i++) {
-      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &r, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &r_aes.r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -645,17 +642,16 @@ void scenario_encrypt_message_seed() {
     }
 
     switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    {
-      profiler_t p;
-      for (int i = 0; i < actual_message_length; i++) {
-        precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
-      }
+    rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
+    rng_list[0] = &rng_aes_list[0].r;
+    for (int i = 1; i < actual_message_length; i++) {
+      rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
+      rng_aes_list[i].r.next_elem(&rng_aes_list[i].r);
+      rng_list[i] = &rng_aes_list[i].r;
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_encrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_encrypt_message(buf_out, buf_message, buf_arg, rng_list, actual_message_length);
 
       for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -672,17 +668,16 @@ void scenario_decrypt_message_seed() {
     }
 
     switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new(&r, buf_seed_2, mode);
-    {
-      profiler_t p;
-      for (int i = 0; i < actual_message_length; i++) {
-        precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
-      }
+    rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
+    rng_list[0] = &rng_aes_list[0].r;
+    for (int i = 1; i < actual_message_length; i++) {
+      rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
+      rng_aes_list[i].r.next_elem(&rng_aes_list[i].r);
+      rng_list[i] = &rng_aes_list[i].r;
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_decrypt_message(buf_out, buf_message, buf_arg, &r, actual_message_length, buf_random_values);
-      rng_reset_indices(&r);
+      benchmark_decrypt_message(buf_out, buf_message, buf_arg, rng_list, actual_message_length);
 
       for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -699,26 +694,18 @@ void scenario_fill_rnd_table_aes() {
   }
 
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  rng_new(&r, buf_seed_2, mode);
-
-  for (int i = 0; i < MAX_MESSAGE_SIZE; i++) {
-    precompute_prng(buf_random_values + 2 * KEYROUND_WIDTH * i, &r);
-  }
+  rng_new_aes(&r_aes, buf_seed_2, mode);
 }
 
-void scenario_fill_rnd_table_arduino() {
+void scenario_fill_rnd_table_chacha() {
   // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
   if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN) {
       print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
       return;
   }
 
-  randomSeed(*buf_seed_1); // TODO: change
-
-  uint8_t* buf_random_values_byte = (uint8_t*) buf_random_values; 
-  for (int i = 0; i < sizeof(buf_random_values); i++) {
-    buf_random_values_byte[i] = random(256);
-  }
+  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+  //rng_new_chacha(&r_aes, buf_seed_2, mode);
 }
 
 void setup() {
@@ -796,7 +783,7 @@ void process_input() {
       scenario_fill_rnd_table_aes();
     } else if (choice == "genRndArduino") {
       // Fill a table with random values for faster subsequent lookups with the built-in random function.
-      scenario_fill_rnd_table_arduino();
+      scenario_fill_rnd_table_chacha();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
     }

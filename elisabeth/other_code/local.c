@@ -31,21 +31,21 @@ int main() {
   uint4_t key[KEY_WIDTH_4];
 
   while (1) {
-    uint8_t* seed = (uint8_t*) 0x386F8B02;
-    rng r_enc, r_dec;
-    rng_new(&r_enc, seed, 1);
-    rng_new(&r_dec, seed, 1);
-    const char* plain_str = "A3F9F7DEDDBEE82D";
+    uint8_t* seed = (uint8_t*) "\xA5\x60\x20\x88\x28\x35\xDF\xE2\xA8\x64\x7D\x9D\x7A\xFF\x38\x80";
+    rng_aes r_enc, r_dec;
+    rng_new_aes(&r_enc, seed, 1);
+    rng_new_aes(&r_dec, seed, 1);
+    const char* plain_str = "569A28F2D14026FA39BE674640B8A223BE744818E6812F2F1F1302B0AC9D95F7";
     for (int i = 0; i < strlen(plain_str); i++) {
       plaintext[i] = uint4_new(hex2int(plain_str[i]));
     }
-    const char* key_str = "4529C2464C198BBA62C60AF845E400B596CA981348A7B9645E2DB3506245F1FDD084F85AEC8342D24AB857F48B2F1FC0A0E5242E4AF16397F8FE5ADD37D8554CBA03E26DEFB23A89F70BD6AE822F43BF9339D72E1D986BE042E40CC09356AA66D658D43D3EEE580F8B9D7413B0D4AC4C5C35382C3E8EA757B0EF78DAF98F7A56>";
+    const char* key_str = "2EB2E1552681D58BA9611553F2DF956EB67A20F09156F0120B7EEAC550F314E3BBE41054DD16DC330877BEF3B8BA52A3753CDC0AD535376156979934FD2E99B2B0A1B515F52C2AADC1C96F14F8A224BAA1668277E9B4F41EE518D2A18F56043CF484DDD5CA9F2E30C366FDB949DF7DF622166E97DCAF6E5C18B36FE80C664865";
     for (int i = 0; i < strlen(key_str); i++) {
       key[i] = uint4_new(hex2int(key_str[i]));
     }
 
-    encrypt(ciphertext, plaintext, key, &r_enc, 16);
-    decrypt(decrypted, ciphertext, key, &r_dec, 16);
+    encrypt(ciphertext, plaintext, key, &r_enc.r, 16);
+    decrypt(decrypted, ciphertext, key, &r_dec.r, 16);
 
     printf("Seed (big-endian) : ");
     printf("%llX", seed);

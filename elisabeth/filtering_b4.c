@@ -34,7 +34,10 @@ void init_sboxes_b4() {
 
 uint4_t filter_block_b4(const uint4_t* block) {
     size_t new_width = BLOCK_WIDTH_B4 - 1;
-    uint4_t* x = block;
+    uint4_t x[BLOCK_WIDTH_B4];
+    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+        x[i] = block[i];
+    }
     uint4_t y[new_width];
     uint4_t z[new_width];
     uint4_t t[new_width];
