@@ -2,6 +2,7 @@
 extern "C" {
   #include "encryption.h"
   #include "generator_aes.h"
+  #include "generator_cha.h"
 }
 
 // Define Interrupt pin
@@ -196,7 +197,7 @@ void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t*
 
 #define MAX_MESSAGE_SIZE 64
 
-#define MAX_INPUT_SIZE 10 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
+#define MAX_INPUT_SIZE 32 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
 #define START '<'
 #define DELIMITER ','
 #define STOP '>'
@@ -430,14 +431,20 @@ void recv_input() {
   }
 }
 
-#include <Profiler.h>
-
+struct aes_or_cha_list {
+  int type; // 0: AES, 1: CHACHA
+  union {
+    rng_aes aes[MAX_MESSAGE_SIZE];
+    rng_cha cha[MAX_MESSAGE_SIZE];
+  } l;
+};
 
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
 uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-rng_aes rng_aes_list[MAX_MESSAGE_SIZE];
-const rng* rng_list[MAX_MESSAGE_SIZE];
+aes_or_cha_list rng_list;
+rng* chosen_rng;
+const rng* rng_refs[MAX_MESSAGE_SIZE];
 
 int BLOCK_WIDTH, KEYROUND_WIDTH, KEY_WIDTH;
 
@@ -494,7 +501,7 @@ void scenario_whitening_seed() {
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening(buf_out, buf_arg, &rng_aes_list[0].r);
+      benchmark_whitening(buf_out, buf_arg, chosen_rng);
 
       for (int i = 0; i < KEYROUND_WIDTH; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -545,7 +552,7 @@ void scenario_whitening_and_filter() {
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening_and_filter(buf_out, buf_arg, &rng_aes_list[0].r);
+      benchmark_whitening_and_filter(buf_out, buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -596,7 +603,7 @@ void scenario_encrypt_elem() {
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &rng_aes_list[0].r);
+      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -613,7 +620,7 @@ void scenario_decrypt_elem() {
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &rng_aes_list[0].r);
+      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -629,15 +636,30 @@ void scenario_encrypt_message() {
         return;
     }
 
-    rng_list[0] = &rng_aes_list[0].r;
-    for (int i = 1; i < actual_message_length; i++) {
-      rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
-      rng_aes_list[i].r.next_elem(&rng_aes_list[i].r);
-      rng_list[i] = &rng_aes_list[i].r;
+    switch (rng_list.type) {
+      case 0: // AES
+        rng_refs[0] = &rng_list.l.aes[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
+          rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
+          rng_refs[i] = &rng_list.l.aes[i].r;
+        }
+        break;
+      case 1: // CHACHA
+        rng_refs[0] = &rng_list.l.cha[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
+          rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
+          rng_refs[i] = &rng_list.l.cha[i].r;
+        }
+        break;
+      default:
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
+        return;
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_encrypt_message(buf_out, buf_message, buf_arg, rng_list, actual_message_length);
+      benchmark_encrypt_message(buf_out, buf_message, buf_arg, rng_refs, actual_message_length);
 
       for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -653,15 +675,30 @@ void scenario_decrypt_message() {
         return;
     }
 
-    rng_list[0] = &rng_aes_list[0].r;
-    for (int i = 1; i < actual_message_length; i++) {
-      rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
-      rng_aes_list[i].r.next_elem(&rng_aes_list[i].r);
-      rng_list[i] = &rng_aes_list[i].r;
+    switch (rng_list.type) {
+      case 0: // AES
+        rng_refs[0] = &rng_list.l.aes[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
+          rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
+          rng_refs[i] = &rng_list.l.aes[i].r;
+        }
+        break;
+      case 1: // CHACHA
+        rng_refs[0] = &rng_list.l.cha[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
+          rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
+          rng_refs[i] = &rng_list.l.cha[i].r;
+        }
+        break;
+      default:
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
+        return;
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_decrypt_message(buf_out, buf_message, buf_arg, rng_list, actual_message_length);
+      benchmark_decrypt_message(buf_out, buf_message, buf_arg, rng_refs, actual_message_length);
 
       for (int i = 0; i < actual_message_length; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -677,8 +714,13 @@ void scenario_fill_rnd_table_aes() {
       return;
   }
 
+  rng_list.type = 0;
+
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
+  rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
+
+  chosen_rng = &rng_list.l.aes[0].r;
+
   Serial.print("1");
 }
 
@@ -689,9 +731,14 @@ void scenario_fill_rnd_table_chacha() {
       return;
   }
 
+  rng_list.type = 1;
+
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  //rng_new_chacha(&rng_aes_list[0], buf_seed_2, mode);
-  Serial.print("0");
+  rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
+
+  chosen_rng = &rng_list.l.cha[0].r;
+
+  Serial.print("1");
 }
 
 void setup() {
@@ -767,8 +814,8 @@ void process_input() {
     } else if (choice == "genRndAES") {
       // Fill a table with random values for faster subsequent lookups with AES.
       scenario_fill_rnd_table_aes();
-    } else if (choice == "genRndArduino") {
-      // Fill a table with random values for faster subsequent lookups with the built-in random function.
+    } else if (choice == "genRndChacha") {
+      // Fill a table with random values for faster subsequent lookups with Chacha.
       scenario_fill_rnd_table_chacha();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");

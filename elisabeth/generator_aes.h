@@ -11,7 +11,6 @@
 typedef struct {
     rng r;
     struct AES_ctx ctx;
-    const uint8_t* key; // AES_KEYLEN
     uint8_t ctr[AES_BLOCKLEN];
     size_t batch_idx;
 } rng_aes;

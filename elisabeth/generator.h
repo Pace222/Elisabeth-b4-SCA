@@ -18,5 +18,8 @@ struct _rng {
 };
 
 void switch_endianness(uint8_t*, const uint8_t*, int);
+void precompute_prng(rng*, uint8_t*);
+void copy_rng(rng*, const rng*);
+void rng_new(rng*, int, uint8_t (*)(rng*, uint8_t*), void (*)(rng*, const rng*), void (*)(rng*));
 
 #endif

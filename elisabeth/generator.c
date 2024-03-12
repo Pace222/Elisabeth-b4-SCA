@@ -60,3 +60,15 @@ void copy_rng(rng* dest, const rng* src) {
     dest->copy = src->copy;
     dest->next_elem = src->next_elem;
 }
+
+void rng_new(rng* r, int mode, uint8_t (*gen_rand_uniform)(rng*, uint8_t*), void (*copy)(rng*, const rng*), void (*next_elem)(rng*)) {
+    int KEY_WIDTH = mode ? KEY_WIDTH_4 : KEY_WIDTH_B4;
+
+    for (int i = 0; i < KEY_WIDTH; i++) {
+        r->indices[i] = i;
+    }
+    r->mode = mode;
+    r->gen_rand_uniform = gen_rand_uniform;
+    r->copy = copy;
+    r->next_elem = next_elem;
+}
