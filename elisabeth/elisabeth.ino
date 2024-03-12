@@ -195,7 +195,7 @@ void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t*
 
 #define MAX_MESSAGE_SIZE 64
 
-#define MAX_INPUT_SIZE AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
+#define MAX_INPUT_SIZE 10 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
 #define START '<'
 #define DELIMITER ','
 #define STOP '>'
