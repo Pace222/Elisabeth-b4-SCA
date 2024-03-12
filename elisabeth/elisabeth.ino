@@ -1,6 +1,7 @@
 
 extern "C" {
   #include "encryption.h"
+  #include "generator_aes.h"
 }
 
 // Define Interrupt pin
