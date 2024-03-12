@@ -435,7 +435,6 @@ void recv_input() {
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
 uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-rng_aes r_aes;
 rng_aes rng_aes_list[MAX_MESSAGE_SIZE];
 const rng* rng_list[MAX_MESSAGE_SIZE];
 
@@ -487,17 +486,14 @@ int setup_choice() {
 }
 
 void scenario_whitening_seed() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is the key. Output is the round key.
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the round key (SIZE: " + String(KEYROUND_WIDTH) + " nibbles).");
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the round key. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the round key (SIZE: " + String(KEYROUND_WIDTH) + " nibbles). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&r_aes, buf_seed_2, mode);
-
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening(buf_out, buf_arg, &r_aes.r);
+      benchmark_whitening(buf_out, buf_arg, &rng_aes_list[0].r);
 
       for (int i = 0; i < KEYROUND_WIDTH; i++) Serial.print(((char*) buf_out)[i], HEX);
       if (i < repeat - 1) {
@@ -541,17 +537,14 @@ void scenario_filter() {
 }
 
 void scenario_whitening_and_filter() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is the key. Output is the output of the filtering function. 
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles).");
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&r_aes, buf_seed_2, mode);
-
     for (int i = 0; i < repeat; i++) {
-      benchmark_whitening_and_filter(buf_out, buf_arg, &r_aes.r);
+      benchmark_whitening_and_filter(buf_out, buf_arg, &rng_aes_list[0].r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -563,7 +556,7 @@ void scenario_whitening_and_filter() {
 void scenario_addition() {
     // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is a single element of the plaintext, arg2 is the output of the filtering function. Output is a single element of the ciphertext.
     if (fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, 1, DELIMITER) != 1) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the plaintext (SIZE: " + String(1) + " nibbles), arg2 is the output of the filtering function (SIZE: " + String(1) + " nibbles). Output is a single element of the ciphertext (SIZE: " + String(1) + " nibbles).");
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the plaintext (SIZE: 1 + " + String(1) + " nibbles), arg2 is the output of the filtering function (SIZE: 1 + " + String(1) + " nibbles). Output is a single element of the ciphertext (SIZE: " + String(1) + " nibbles).");
         return;
     }
 
@@ -580,7 +573,7 @@ void scenario_addition() {
 void scenario_subtraction() {
     // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is a single element of the ciphertext, arg2 is the output of the filtering function. Output is a single element of the plaintext.
     if (fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, 1, DELIMITER) != 1) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the ciphertext (SIZE: " + String(1) + " nibbles), arg2 is the output of the filtering function (SIZE: " + String(1) + " nibbles). Output is a single element of the plaintext (SIZE: " + String(1) + " nibbles).");
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the ciphertext (SIZE: 1 + " + String(1) + " nibbles), arg2 is the output of the filtering function (SIZE: 1 + " + String(1) + " nibbles). Output is a single element of the plaintext (SIZE: " + String(1) + " nibbles).");
         return;
     }
 
@@ -594,18 +587,15 @@ void scenario_subtraction() {
     }
 }
 
-void scenario_encrypt_elem_seed() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is a single element of the plaintext, arg3 is the key. Output is a single element of the ciphertext.
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is a single element of the plaintext (SIZE: " + String(1) + " nibbles), arg3 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is a single element of the ciphertext (SIZE: " + String(1) + " nibbles).");
+void scenario_encrypt_elem() {
+    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is a single element of the plaintext, arg2 is the key. Output is a single element of the ciphertext. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the plaintext (SIZE: 1 + " + String(1) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is a single element of the ciphertext (SIZE: " + String(1) + " nibbles). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&r_aes, buf_seed_2, mode);
-
     for (int i = 0; i < repeat; i++) {
-      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &r_aes.r);
+      benchmark_encrypt_element(buf_out, buf_message[0], buf_arg, &rng_aes_list[0].r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -614,18 +604,15 @@ void scenario_encrypt_elem_seed() {
     }
 }
 
-void scenario_decrypt_elem_seed() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is a single element of the ciphertext, arg3 is the key. Output is a single element of the plaintext.
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is a single element of the ciphertext (SIZE: " + String(1) + " nibbles), arg3 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is a single element of the plaintext (SIZE: " + String(1) + " nibbles).");
+void scenario_decrypt_elem() {
+    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is a single element of the ciphertext, arg2 is the key. Output is a single element of the plaintext. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is a single element of the ciphertext (SIZE: 1 + " + String(1) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is a single element of the plaintext (SIZE: " + String(1) + " nibbles). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&r_aes, buf_seed_2, mode);
-
     for (int i = 0; i < repeat; i++) {
-      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &r_aes.r);
+      benchmark_decrypt_element(buf_out, buf_message[0], buf_arg, &rng_aes_list[0].r);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -634,15 +621,13 @@ void scenario_decrypt_elem_seed() {
     }
 }
 
-void scenario_encrypt_message_seed() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is the complete plaintext (message) to encrypt, arg3 is the key. Output is the complete ciphertext (encrypted message).
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || (actual_message_length = fill_array_from_user_until(buf_message, DELIMITER)) <= 0 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg3 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext).");
+void scenario_encrypt_message() {
+    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the complete plaintext (message) to encrypt, arg2 is the key. Output is the complete ciphertext (encrypted message). Expects to have filled the random table in a previous command.
+    if ((actual_message_length = fill_array_from_user_until(buf_message, DELIMITER)) <= 0 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
     rng_list[0] = &rng_aes_list[0].r;
     for (int i = 1; i < actual_message_length; i++) {
       rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
@@ -660,15 +645,13 @@ void scenario_encrypt_message_seed() {
     }
 }
 
-void scenario_decrypt_message_seed() {
-    // Format: [0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the seed for the PRNG (IV), arg2 is the complete ciphertext (encrypted message) to decrypt, arg3 is the key. Output is the complete plaintext (decrypted message).
-    if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN || (actual_message_length = fill_array_from_user_until(buf_message, DELIMITER)) <= 0 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles), arg2 is the complete ciphertext (encrypted message) to decrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg3 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete plaintext (decrypted message) (SIZE: same as ciphertext).");
+void scenario_decrypt_message() {
+    // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the complete ciphertext (encrypted message) to decrypt, arg2 is the key. Output is the complete plaintext (decrypted message). Expects to have filled the random table in a previous command.
+    if ((actual_message_length = fill_array_from_user_until(buf_message, DELIMITER)) <= 0 || fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete ciphertext (encrypted message) to decrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete plaintext (decrypted message) (SIZE: same as ciphertext). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
     rng_list[0] = &rng_aes_list[0].r;
     for (int i = 1; i < actual_message_length; i++) {
       rng_aes_list[i - 1].r.copy(&rng_aes_list[i].r, &rng_aes_list[i - 1].r);
@@ -694,7 +677,7 @@ void scenario_fill_rnd_table_aes() {
   }
 
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  rng_new_aes(&r_aes, buf_seed_2, mode);
+  rng_new_aes(&rng_aes_list[0], buf_seed_2, mode);
   Serial.print("1");
 }
 
@@ -706,7 +689,7 @@ void scenario_fill_rnd_table_chacha() {
   }
 
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  //rng_new_chacha(&r_aes, buf_seed_2, mode);
+  //rng_new_chacha(&rng_aes_list[0], buf_seed_2, mode);
   Serial.print("0");
 }
 
@@ -770,16 +753,16 @@ void process_input() {
       scenario_subtraction();
     } else if (choice == "6") {
       // Benchmark complete encryption, single element
-      scenario_encrypt_elem_seed();
+      scenario_encrypt_elem();
     } else if (choice == "7") {
       // Benchmark complete decryption, single element
-      scenario_decrypt_elem_seed();
+      scenario_decrypt_elem();
     } else if (choice == "8") {
       // Benchmark complete encryption, full message
-      scenario_encrypt_message_seed();
+      scenario_encrypt_message();
     } else if (choice == "9") {
       // Benchmark complete decryption, full message
-      scenario_decrypt_message_seed();
+      scenario_decrypt_message();
     } else if (choice == "genRndAES") {
       // Fill a table with random values for faster subsequent lookups with AES.
       scenario_fill_rnd_table_aes();
