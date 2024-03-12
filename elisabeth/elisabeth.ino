@@ -695,6 +695,7 @@ void scenario_fill_rnd_table_aes() {
 
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
   rng_new_aes(&r_aes, buf_seed_2, mode);
+  Serial.print("1");
 }
 
 void scenario_fill_rnd_table_chacha() {
@@ -706,6 +707,7 @@ void scenario_fill_rnd_table_chacha() {
 
   switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
   //rng_new_chacha(&r_aes, buf_seed_2, mode);
+  Serial.print("0");
 }
 
 void setup() {
