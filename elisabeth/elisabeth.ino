@@ -1,3 +1,4 @@
+#include <Profiler.h>
 
 extern "C" {
   #include "encryption.h"
@@ -11,20 +12,22 @@ extern "C" {
 // Define trigger  PIN
 #define TriggerPQ A0
 
+#define TRIGGER_DELAY 20
+
 void benchmark_whitening(uint4_t* keyround, uint4_t* key, rng* r) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   random_whitened_subset(keyround, key, r);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 }
 
 void benchmark_filter_block(uint4_t* filter_el, uint4_t* block, int mode) {
@@ -33,16 +36,16 @@ void benchmark_filter_block(uint4_t* filter_el, uint4_t* block, int mode) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   uint4_t res = filter_block(block);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *filter_el = res;
 }
@@ -51,16 +54,16 @@ void benchmark_filter(uint4_t* key_el, uint4_t* keyround, int mode) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   uint4_t res = filter(keyround, mode);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *key_el = res;
 }
@@ -70,17 +73,17 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   random_whitened_subset(keyround, key, r);
   uint4_t res = filter(keyround, r->mode);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *key_el = res;
 }
@@ -89,16 +92,16 @@ void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   uint4_t r = uint4_add(plain_el, key_el);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *cipher_el = r;
 }
@@ -107,16 +110,16 @@ void benchmark_subtraction(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t key
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   uint4_t r = uint4_add(cipher_el, uint4_neg(key_el));
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *decrypted_el = r;
 }
@@ -127,17 +130,17 @@ void benchmark_encrypt_element(uint4_t* cipher_el, uint4_t plain_el, uint4_t* ke
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
 
   random_whitened_subset(keyround, key, r);
   uint4_t res = uint4_add(plain_el, filter(keyround, r->mode));
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *cipher_el = res;
 }
@@ -148,17 +151,17 @@ void benchmark_decrypt_element(uint4_t* decrypted_el, uint4_t cipher_el, uint4_t
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
 
   random_whitened_subset(keyround, key, r);
   uint4_t res = uint4_add(cipher_el, uint4_neg(filter(keyround, r->mode)));
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 
   *decrypted_el = res;
 }
@@ -167,32 +170,32 @@ void benchmark_encrypt_message(uint4_t* ciphertext, uint4_t* plaintext, uint4_t*
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   encrypt(ciphertext, plaintext, key, r, length);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 }
 
 void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t* key, const rng** r, size_t length) {
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   decrypt(decrypted, ciphertext, key, r, length);
 
-  interrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(100);
+  delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  interrupts();
 }
 
 #define MAX_MESSAGE_SIZE 64
@@ -636,26 +639,29 @@ void scenario_encrypt_message() {
         return;
     }
 
-    switch (rng_list.type) {
-      case 0: // AES
-        rng_refs[0] = &rng_list.l.aes[0].r;
-        for (int i = 1; i < actual_message_length; i++) {
-          rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
-          rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
-          rng_refs[i] = &rng_list.l.aes[i].r;
-        }
-        break;
-      case 1: // CHACHA
-        rng_refs[0] = &rng_list.l.cha[0].r;
-        for (int i = 1; i < actual_message_length; i++) {
-          rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
-          rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
-          rng_refs[i] = &rng_list.l.cha[i].r;
-        }
-        break;
-      default:
-        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
-        return;
+    {
+      profiler_t p;
+      switch (rng_list.type) {
+        case 0: // AES
+          rng_refs[0] = &rng_list.l.aes[0].r;
+          for (int i = 1; i < actual_message_length; i++) {
+            rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
+            rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
+            rng_refs[i] = &rng_list.l.aes[i].r;
+          }
+          break;
+        case 1: // CHACHA
+          rng_refs[0] = &rng_list.l.cha[0].r;
+          for (int i = 1; i < actual_message_length; i++) {
+            rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
+            rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
+            rng_refs[i] = &rng_list.l.cha[i].r;
+          }
+          break;
+        default:
+          print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
+          return;
+      }
     }
 
     for (int i = 0; i < repeat; i++) {
@@ -716,12 +722,15 @@ void scenario_fill_rnd_table_aes() {
 
   rng_list.type = 0;
 
-  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
+  {
+    profiler_t p;
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
+  }
 
   chosen_rng = &rng_list.l.aes[0].r;
 
-  Serial.print("1");
+  //Serial.print("1");
 }
 
 void scenario_fill_rnd_table_chacha() {
@@ -733,12 +742,15 @@ void scenario_fill_rnd_table_chacha() {
 
   rng_list.type = 1;
 
-  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-  rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
+  {
+    profiler_t p;
+    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+    rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
+  }
 
   chosen_rng = &rng_list.l.cha[0].r;
 
-  Serial.print("1");
+  //Serial.print("1");
 }
 
 void setup() {
