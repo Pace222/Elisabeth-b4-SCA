@@ -1,5 +1,3 @@
-#include <Profiler.h>
-
 extern "C" {
   #include "encryption.h"
   #include "generator_aes.h"
@@ -45,6 +43,7 @@ void benchmark_filter_block(uint4_t* filter_el, uint4_t* block, int mode) {
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(25);
   interrupts();
 
   *filter_el = res;
@@ -639,29 +638,26 @@ void scenario_encrypt_message() {
         return;
     }
 
-    {
-      profiler_t p;
-      switch (rng_list.type) {
-        case 0: // AES
-          rng_refs[0] = &rng_list.l.aes[0].r;
-          for (int i = 1; i < actual_message_length; i++) {
-            rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
-            rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
-            rng_refs[i] = &rng_list.l.aes[i].r;
-          }
-          break;
-        case 1: // CHACHA
-          rng_refs[0] = &rng_list.l.cha[0].r;
-          for (int i = 1; i < actual_message_length; i++) {
-            rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
-            rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
-            rng_refs[i] = &rng_list.l.cha[i].r;
-          }
-          break;
-        default:
-          print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
-          return;
-      }
+    switch (rng_list.type) {
+      case 0: // AES
+        rng_refs[0] = &rng_list.l.aes[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.aes[i - 1].r.copy(&rng_list.l.aes[i].r, &rng_list.l.aes[i - 1].r);
+          rng_list.l.aes[i].r.next_elem(&rng_list.l.aes[i].r);
+          rng_refs[i] = &rng_list.l.aes[i].r;
+        }
+        break;
+      case 1: // CHACHA
+        rng_refs[0] = &rng_list.l.cha[0].r;
+        for (int i = 1; i < actual_message_length; i++) {
+          rng_list.l.cha[i - 1].r.copy(&rng_list.l.cha[i].r, &rng_list.l.cha[i - 1].r);
+          rng_list.l.cha[i].r.next_elem(&rng_list.l.cha[i].r);
+          rng_refs[i] = &rng_list.l.cha[i].r;
+        }
+        break;
+      default:
+        print_format(mode, choice, "[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the complete plaintext (message) to encrypt (SIZE: max " + String(MAX_MESSAGE_SIZE) + " nibbles), arg2 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the complete ciphertext (encrypted message) (SIZE: same as plaintext). Expects to have filled the random table in a previous command.");
+        return;
     }
 
     for (int i = 0; i < repeat; i++) {
@@ -722,11 +718,8 @@ void scenario_fill_rnd_table_aes() {
 
   rng_list.type = 0;
 
-  {
-    profiler_t p;
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
-  }
+  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+  rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
 
   chosen_rng = &rng_list.l.aes[0].r;
 
@@ -742,11 +735,8 @@ void scenario_fill_rnd_table_chacha() {
 
   rng_list.type = 1;
 
-  {
-    profiler_t p;
-    switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
-    rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
-  }
+  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+  rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
 
   chosen_rng = &rng_list.l.cha[0].r;
 
