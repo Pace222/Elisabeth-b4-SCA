@@ -21,11 +21,11 @@ uint32_t random_uniform_n_lsb(rng* r, size_t n, uint8_t* batch) {
 }
 
 uint32_t gen_range(rng* r, size_t min, size_t max, uint8_t* batch) {
-    if (min > max) {
+    if (min > max - 1) {
         return -1;
     }
 
-    size_t bit_len = (size_t) floor(log2(max - min));
+    size_t bit_len = (size_t) floor(log2(max - 1 - min)) + 1;
     size_t a = min + random_uniform_n_lsb(r, bit_len, batch);
 
     while (a >= max) {
