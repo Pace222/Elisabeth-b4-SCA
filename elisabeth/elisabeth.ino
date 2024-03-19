@@ -82,6 +82,7 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
   interrupts();
 
   *key_el = res;
@@ -495,7 +496,7 @@ int setup_choice() {
     return 0;
 }
 
-void scenario_whitening_seed() {
+void scenario_whitening() {
     // Format: [0-9A-Fa-f]. arg1 is the key. Output is the round key. Expects to have filled the random table in a previous command.
     if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
         print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the round key (SIZE: " + String(KEYROUND_WIDTH) + " nibbles). Expects to have filled the random table in a previous command.");
@@ -728,14 +729,14 @@ void scenario_fill_rnd_table_aes() {
 
 void scenario_fill_rnd_table_chacha() {
   // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
-  if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN) {
+  if (fill_array_from_user_hex_bytes(buf_seed_1, CHACHA_KEYLEN, DELIMITER) != CHACHA_KEYLEN) {
       print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
       return;
   }
 
   rng_list.type = 1;
 
-  switch_endianness(buf_seed_2, buf_seed_1, AES_KEYLEN);
+  switch_endianness(buf_seed_2, buf_seed_1, CHACHA_KEYLEN);
   rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
 
   chosen_rng = &rng_list.l.cha[0].r;
@@ -785,7 +786,7 @@ void process_input() {
 
     if (choice == "0") {
       // Benchmark whitening
-      scenario_whitening_seed();
+      scenario_whitening();
     } else if (choice == "1") {
       // Benchmark single block of filter function
       scenario_filter_block();
