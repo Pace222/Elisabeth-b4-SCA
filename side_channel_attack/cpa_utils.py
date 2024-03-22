@@ -20,6 +20,7 @@ BLOCK_WIDTH_4 = 5
 BLOCK_WIDTH_B4 = 7
 
 HW = [bin(n).count("1") for n in range(0, 16)]
+HD = [[HW[n1 ^ n2] for n2 in range(0, 16)] for n1 in range(0, 16)]
 
 def corr_coef(hypotheses, traces):
     #Initialize arrays & variables to zero
@@ -143,7 +144,7 @@ def chacha_random_b4(seed: str):
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
 
-def hypothesis_b4_rws_sboxes_location(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
+def hypothesis_b4_rws_sboxes_location_hw(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
     indices, whitening = chacha_random_b4(iv)
 
     block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
@@ -166,12 +167,36 @@ def hypothesis_b4_rws_sboxes_location(iv: str, key: List[int], round_idx: int, b
 
         return HW[(block[block_idx] + sbox_out) % 16]
 
+def hypothesis_b4_rws_sboxes_location_hd(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
+    indices, whitening = chacha_random_b4(iv)
+
+    block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
+
+    if block_idx != BLOCK_WIDTH_B4 - 1:
+        if block_idx % 2 == 0:
+            sbox_in = block[block_idx]
+        else:
+            sbox_in = (block[block_idx] + block[block_idx - 1]) % 16
+        sbox_out = s_boxes_b4[block_idx][sbox_in]
+        return HD[sbox_in][sbox_out]
+    else:
+        for i in range(3):
+            block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
+        y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
+        z = [(y[(2*i + 5*j - 1) % (BLOCK_WIDTH_B4 - 1)] + y[2*i + j]) % 16 for i in range(3) for j in range(2)]
+        z = [s_boxes_b4[6 + i][(z[i] + block[(i + 2) % (BLOCK_WIDTH_B4 - 1)]) % 16] for i in range(BLOCK_WIDTH_B4 - 1)]
+        t_0 = (z[0] + z[1] + z[2]) % 16
+        t_0 = (t_0 + block[block_idx - 1]) % 16
+        sbox_out = s_boxes_b4[12][t_0]
+
+        return HD[block[block_idx] + sbox_out][(block[block_idx] + sbox_out) % 16]
+
 def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.ndarray, filename: str) -> np.ndarray:
     correlation_locations = [[[0] * 10] * BLOCK_WIDTH_B4] * (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 2)
     for round_idx in range(len(correlation_locations), KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
         corr_round = []
         for block_idx in range(BLOCK_WIDTH_B4):
-            hyps = np.array([hypothesis_b4_rws_sboxes_location(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
+            hyps = np.array([hypothesis_b4_rws_sboxes_location_hd(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
             corr = corr_coef(hyps, traces.reshape((-1, traces.shape[2])))
             loc = np.argmax(corr)
             corr_round.append(list(range(loc - 5, loc + 5)))
