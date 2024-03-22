@@ -196,7 +196,7 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
     for round_idx in range(len(correlation_locations), KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
         corr_round = []
         for block_idx in range(BLOCK_WIDTH_B4):
-            hyps = np.array([hypothesis_b4_rws_sboxes_location_hd(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
+            hyps = np.array([hypothesis_b4_rws_sboxes_location_hw(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
             corr = corr_coef(hyps, traces.reshape((-1, traces.shape[2])))
             loc = np.argmax(corr)
             corr_round.append(list(range(loc - 5, loc + 5)))
