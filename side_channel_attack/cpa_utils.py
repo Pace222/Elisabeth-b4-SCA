@@ -19,8 +19,8 @@ KEY_WIDTH_B4 = 512
 BLOCK_WIDTH_4 = 5
 BLOCK_WIDTH_B4 = 7
 
-HW = [bin(n).count("1") for n in range(0, 16)]
-HD = [[HW[n1 ^ n2] for n2 in range(0, 16)] for n1 in range(0, 16)]
+HW = [bin(n).count("1") for n in range(0, 128)]
+HD = [[HW[n1 ^ n2] for n2 in range(0, 128)] for n1 in range(0, 128)]
 
 def corr_coef(hypotheses, traces):
     #Initialize arrays & variables to zero
@@ -212,15 +212,15 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
 
     return correlation_locations
 
-def load_data(traces_path: str, key_path: str, locations_path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    traces_dict = sio.loadmat(traces_path)
+def load_data(traces_path: str, key_path: str, locations_path: str, max_traces: int = None, nr_keys: int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
     traces_size = Counter([traces_dict[k][0, 0][4][:, 0].shape[0] for k in traces_dict.keys() if k.startswith("data_")]).most_common(1)[0][0]
     empty_traces = {k for k in traces_dict.keys() if k.startswith("data_") and traces_dict[k][0, 0][4][:, 0].shape[0] != traces_size}
     traces = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces], axis=0)
-    traces = traces.reshape((1, -1, traces.shape[1]))
+    traces = traces.reshape((nr_keys, -1, traces.shape[1]))
 
     inputs_outputs = log_parser.parse(key_path)
-    real_keys = np.array([inputs_outputs[1][0][0]])
+    real_keys = np.array([inputs_outputs[2 * traces.shape[1] * i + 1][0][0] for i in range(nr_keys)])
     real_keys = np.array([[int(c, 16) for c in key] for key in real_keys])
 
     seeds = np.array([inputs_outputs[2 * (int(k[len("data_"):]) - 1)][0][0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces])
