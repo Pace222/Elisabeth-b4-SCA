@@ -198,6 +198,24 @@ void benchmark_decrypt_message(uint4_t* decrypted, uint4_t* ciphertext, uint4_t*
   interrupts();
 }
 
+void benchmark_test_sbox(uint4_t* output, uint4_t index, uint4_t* input) {
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  uint4_t res = S_BOXES_B4[index][input[index]];
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  interrupts();
+
+  *output = res;
+}
+
 #define MAX_MESSAGE_SIZE 64
 
 #define MAX_INPUT_SIZE 32 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
@@ -744,6 +762,25 @@ void scenario_fill_rnd_table_chacha() {
   //Serial.print("1");
 }
 
+void scenario_test_sbox() {
+  // Format: [0-5],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the S-Box index, arg2 is the input to the S-Box. Output is the output of the S-Box.
+  if (fill_array_from_user_hex(buf_seed_1, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, 1, DELIMITER) != 1 || buf_seed_1[0] < 0 || buf_seed_1[0] > 5) {
+    print_format(mode, choice, "[0-5],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the S-Box index (SIZE: 1 + " + String(1) + " nibbles), arg2 is the input to the S-Box (SIZE: 1 + " + String(1) + " nibbles). Output is the output of the S-Box.""arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). Output is the output of the S-Box.");
+    return;
+  }
+
+  buf_arg[buf_seed_1[0]] = buf_arg[0];
+
+  for (int i = 0; i < repeat; i++) {
+    benchmark_test_sbox(buf_out, buf_seed_1[0], buf_arg);
+
+    Serial.print(buf_out[0], HEX);
+    if (i < repeat - 1) {
+      Serial.print(DELIMITER);
+    }
+  }
+}
+
 void setup() {
   // Initialize serial and wait for port to open.
   Serial.begin(115200);
@@ -820,6 +857,9 @@ void process_input() {
     } else if (choice == "genRndChacha") {
       // Fill a table with random values for faster subsequent lookups with Chacha.
       scenario_fill_rnd_table_chacha();
+    } else if (choice == "testSBox") {
+      // Run a given S-Box to test it.
+      scenario_test_sbox();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
     }
