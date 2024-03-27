@@ -4,7 +4,7 @@ import re
 
 DELIMITER = ','
 
-regex_input = r"Command sent    = <(4|B4),(\d+),([a-zA-Z0-9]+)(?:,([a-fA-F0-9]+))*>$"
+regex_input = r"Command sent    = <(4|B4),(\d+),([a-zA-Z0-9]+)((?:,[a-fA-F0-9]+)*)>$"
 regex_output = r"Card's response = ((?:[a-fA-F0-9]{2})*) / $"
 
 def parse(log_path: str, actual_args_only: bool = True) -> List[Optional[Tuple[Tuple[str], str]]]:
@@ -54,6 +54,7 @@ def parse(log_path: str, actual_args_only: bool = True) -> List[Optional[Tuple[T
                             ready = False
                             inp = out = None
                         else:
+                            inp = inp[:-1] + tuple(inp[-1].split(DELIMITER)[1:])
                             out = None
                     else:
                         inps_outs.append(None)
