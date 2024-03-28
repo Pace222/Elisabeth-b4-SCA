@@ -227,6 +227,7 @@ def load_data(traces_path: str, key_path: str, locations_path: str, max_traces: 
     seeds = seeds.reshape((-1, traces.shape[1]))
 
     assert traces.shape[0] == seeds.shape[0]
+    assert traces.shape[1] == seeds.shape[1]
 
     with open(locations_path, "rb") as r:
         correlation_locations = pic.load(r)
