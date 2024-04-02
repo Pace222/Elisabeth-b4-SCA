@@ -49,12 +49,12 @@ def corr_coef(hypotheses, traces):
     return correlation
 
 def corr_coef_vectorized(hypotheses, traces):
-    h_mean = np.mean(hypotheses)
-    t_mean = np.mean(traces, axis=0)
+    h_mean = np.mean(hypotheses, axis=-1) # np.mean(hypotheses)
+    t_mean = np.mean(traces, axis=-2) # np.mean(traces, axis=0)
     h_diff, t_diff = hypotheses - h_mean, traces - t_mean
 
-    r_num = np.sum(h_diff[:, None] * t_diff, axis=0)
-    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=0) * np.sum(t_diff * t_diff, axis=0))
+    r_num = np.sum(h_diff[..., None] * t_diff, axis=-2) # np.sum(h_diff[:, None] * t_diff, axis=0)
+    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=-1) * np.sum(t_diff * t_diff, axis=-2)) # np.sqrt(np.sum(h_diff * h_diff, axis=0) * np.sum(t_diff * t_diff, axis=0))
     r = r_num / r_den
     r = np.clip(r, -1.0, 1.0)
     return r
