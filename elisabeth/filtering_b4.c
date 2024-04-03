@@ -23,7 +23,7 @@ void init_sboxes_b4() {
         {0x03, 0x0C, 0x01, 0x08, 0x08, 0x0F, 0x0D, 0x0F, 0x0D, 0x04, 0x0F, 0x08, 0x08, 0x01, 0x03, 0x01},
         {0x0B, 0x03, 0x02, 0x0C, 0x03, 0x08, 0x04, 0x02, 0x05, 0x0D, 0x0E, 0x04, 0x0D, 0x08, 0x0C, 0x0E}
     };
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 18; i++) {
         for (int j = 0; j < 16; j++) {
             S_BOXES_B4[i][j] = uint4_new(s_boxes_8_t[i][j]);
         }
@@ -50,7 +50,7 @@ uint4_t filter_block_b4(const uint4_t* block) {
     }
 
     for (int i = 0; i < new_width / 2; i++) {
-        z[2*i] = uint4_add(y[(2*i - 1) % new_width], y[2*i]);
+        z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
         z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
     }
 
