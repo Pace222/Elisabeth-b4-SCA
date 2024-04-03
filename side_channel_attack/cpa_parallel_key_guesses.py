@@ -1,12 +1,13 @@
 from typing import List, Tuple
 import pickle as pic
 from collections import Counter
+from time import time
+
+import multiprocessing
 
 import numpy as np
-#import cupy as np
 import matplotlib.pyplot as plt
 import scipy.io as sio
-
 
 import log_parser
 
@@ -19,8 +20,7 @@ KEY_WIDTH_B4 = 512
 BLOCK_WIDTH_4 = 5
 BLOCK_WIDTH_B4 = 7
 
-HW = [bin(n).count("1") for n in range(0, 128)]
-HD = [[HW[n1 ^ n2] for n2 in range(0, 128)] for n1 in range(0, 128)]
+HW = [bin(n).count("1") for n in range(0, 256)]
 
 def corr_coef(hypotheses, traces):
     #Initialize arrays & variables to zero
@@ -49,12 +49,12 @@ def corr_coef(hypotheses, traces):
     return correlation
 
 def corr_coef_vectorized(hypotheses, traces):
-    h_mean = np.mean(hypotheses, axis=-1) # np.mean(hypotheses)
-    t_mean = np.mean(traces, axis=-2) # np.mean(traces, axis=0)
+    h_mean = np.mean(hypotheses)
+    t_mean = np.mean(traces, axis=0)
     h_diff, t_diff = hypotheses - h_mean, traces - t_mean
 
-    r_num = np.sum(h_diff[..., None] * t_diff, axis=-2) # np.sum(h_diff[:, None] * t_diff, axis=0)
-    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=-1) * np.sum(t_diff * t_diff, axis=-2)) # np.sqrt(np.sum(h_diff * h_diff, axis=0) * np.sum(t_diff * t_diff, axis=0))
+    r_num = np.sum(h_diff[:, None] * t_diff, axis=0)
+    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=0) * np.sum(t_diff * t_diff, axis=0))
     r = r_num / r_den
     r = np.clip(r, -1.0, 1.0)
     return r
@@ -79,8 +79,6 @@ s_boxes_b4 = [
     [0x03, 0x0C, 0x01, 0x08, 0x08, 0x0F, 0x0D, 0x0F, 0x0D, 0x04, 0x0F, 0x08, 0x08, 0x01, 0x03, 0x01],
     [0x0B, 0x03, 0x02, 0x0C, 0x03, 0x08, 0x04, 0x02, 0x05, 0x0D, 0x0E, 0x04, 0x0D, 0x08, 0x0C, 0x0E]
 ]
-
-s_boxes_b4 = [[s_ & 0x0F for s_ in box] for box in s_boxes_b4]
 
 from ctypes import *
 
@@ -144,92 +142,119 @@ def chacha_random_b4(seed: str):
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
 
-def hypothesis_b4_rws_sboxes_location_hw(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
-    indices, whitening = chacha_random_b4(iv)
+def load_data():
+    traces_path = "..\\acquisition\\carto_eB4-Rnd-3-WhiteningAndFullFilter-1_key_256000_samples\\carto_eB4-Rnd-3-WhiteningAndFullFilter.mat"
+    key_path = "..\\acquisition\\carto_eB4-Rnd-3-WhiteningAndFullFilter-1_key_256000_samples\\carto_eB4-Rnd-3-WhiteningAndFullFilter.log"
 
-    block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
-
-    if block_idx != BLOCK_WIDTH_B4 - 1:
-        if block_idx % 2 == 0:
-            sbox_out = s_boxes_b4[block_idx][block[block_idx]]
-        else:
-            sbox_out = s_boxes_b4[block_idx][(block[block_idx] + block[block_idx - 1]) % 16]
-        return HW[sbox_out]
-    else:
-        for i in range(3):
-            block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
-        y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
-        z = [(y[(2*i + 5*j - 1) % (BLOCK_WIDTH_B4 - 1)] + y[2*i + j]) % 16 for i in range(3) for j in range(2)]
-        z = [s_boxes_b4[6 + i][(z[i] + block[(i + 2) % (BLOCK_WIDTH_B4 - 1)]) % 16] for i in range(BLOCK_WIDTH_B4 - 1)]
-        t_0 = (z[0] + z[1] + z[2]) % 16
-        t_0 = (t_0 + block[block_idx - 1]) % 16
-        sbox_out = s_boxes_b4[12][t_0]
-
-        return HW[(block[block_idx] + sbox_out) % 16]
-
-def hypothesis_b4_rws_sboxes_location_hd(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
-    indices, whitening = chacha_random_b4(iv)
-
-    block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
-
-    if block_idx != BLOCK_WIDTH_B4 - 1:
-        if block_idx % 2 == 0:
-            sbox_in = block[block_idx]
-        else:
-            sbox_in = (block[block_idx] + block[block_idx - 1]) % 16
-        sbox_out = s_boxes_b4[block_idx][sbox_in]
-        return HD[sbox_in][sbox_out]
-    else:
-        for i in range(3):
-            block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
-        y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
-        z = [(y[(2*i + 5*j - 1) % (BLOCK_WIDTH_B4 - 1)] + y[2*i + j]) % 16 for i in range(3) for j in range(2)]
-        z = [s_boxes_b4[6 + i][(z[i] + block[(i + 2) % (BLOCK_WIDTH_B4 - 1)]) % 16] for i in range(BLOCK_WIDTH_B4 - 1)]
-        t_0 = (z[0] + z[1] + z[2]) % 16
-        t_0 = (t_0 + block[block_idx - 1]) % 16
-        sbox_out = s_boxes_b4[12][t_0]
-
-        return HD[block[block_idx] + sbox_out][(block[block_idx] + sbox_out) % 16]
-
-def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.ndarray, filename: str) -> np.ndarray:
-    correlation_locations = [[[0] * 10] * BLOCK_WIDTH_B4] * (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 2)
-    for round_idx in range(len(correlation_locations), KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
-        corr_round = []
-        for block_idx in range(BLOCK_WIDTH_B4):
-            hyps = np.array([hypothesis_b4_rws_sboxes_location_hw(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
-            corr = corr_coef(hyps, traces.reshape((-1, traces.shape[2])))
-            loc = np.argmax(corr)
-            corr_round.append(list(range(loc - 5, loc + 5)))
-            plt.plot(corr)
-            plt.ylim([-0.5, 0.5])
-            plt.title(f"Round {round_idx}, Block {block_idx}, Location: {loc}")
-            plt.show()
-        correlation_locations.append(corr_round)
-    correlation_locations = np.array(correlation_locations)
-
-    with open(filename, "wb") as w:
-        pic.dump(correlation_locations, w)
-
-    return correlation_locations
-
-def load_data(traces_path: str, key_path: str, locations_path: str, max_traces: int = None, nr_keys: int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
+    traces_dict = sio.loadmat(traces_path)
     traces_size = Counter([traces_dict[k][0, 0][4][:, 0].shape[0] for k in traces_dict.keys() if k.startswith("data_")]).most_common(1)[0][0]
     empty_traces = {k for k in traces_dict.keys() if k.startswith("data_") and traces_dict[k][0, 0][4][:, 0].shape[0] != traces_size}
     traces = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces], axis=0)
-    traces = traces.reshape((nr_keys, -1, traces.shape[1]))
+    traces = traces.reshape((1, -1, traces.shape[1]))
 
     inputs_outputs = log_parser.parse(key_path)
-    real_keys = np.array([inputs_outputs[2 * traces.shape[1] * i + 1][0][0] for i in range(nr_keys)])
+    real_keys = np.array([inputs_outputs[1][0][0]])
     real_keys = np.array([[int(c, 16) for c in key] for key in real_keys])
 
     seeds = np.array([inputs_outputs[2 * (int(k[len("data_"):]) - 1)][0][0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces])
     seeds = seeds.reshape((-1, traces.shape[1]))
 
     assert traces.shape[0] == seeds.shape[0]
-    assert traces.shape[1] == seeds.shape[1]
 
-    with open(locations_path, "rb") as r:
+    with open("correlation_locations_b4_two_last_rounds.pic", "rb") as r:
         correlation_locations = pic.load(r)
 
-    return seeds, traces, real_keys, correlation_locations
+    return traces, real_keys, seeds, correlation_locations
+
+def indices_locations_and_hyps_to_use_for_key_nibble(key_guess: List[int], key_target_idx: int, total_seeds: np.ndarray, total_traces: np.ndarray, locations: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    seeds_indices = np.zeros_like(total_seeds, dtype=bool)
+    location_mask_per_trace = np.zeros_like(total_traces, dtype=bool)
+    hypotheses = np.zeros_like(total_seeds, dtype=int)
+
+    for i, iv in enumerate(total_seeds):
+        indices, whitening = chacha_random_b4(iv)
+        keyround_target_idx = indices.index(key_target_idx)
+        if keyround_target_idx < KEYROUND_WIDTH_B4:
+            round_idx = keyround_target_idx // BLOCK_WIDTH_B4
+            block_idx = keyround_target_idx % BLOCK_WIDTH_B4
+            locs = locations[round_idx][block_idx]
+
+            # For now, we only attack even-indexed keyrounds (but not the last one) because they depend on a single key nibble
+            # TO REMOVE IF BETTER IDEA IS FOUND
+            #if block_idx == BLOCK_WIDTH_B4 - 1 or block_idx % 2 != 0:
+            if round_idx != KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 1 or block_idx != 4:
+            #if (round_idx != KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 1 and round_idx != KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 2) or block_idx != 0:
+                continue
+            # TO REMOVE IF BETTER IDEA IS FOUND
+
+            seeds_indices[i] = True
+            location_mask_per_trace[i][locs] = True
+
+            block = [(key_guess[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
+
+            if block_idx != BLOCK_WIDTH_B4 - 1:
+                if block_idx % 2 == 0:
+                    sbox_out = s_boxes_b4[block_idx][block[block_idx]]
+                else:
+                    raise ValueError("Should not happen")
+                    sbox_out = s_boxes_b4[block_idx][(block[block_idx] + block[block_idx - 1]) % 16]
+                hypotheses[i] = HW[sbox_out]
+            else:
+                raise ValueError("Should not happen")
+                for i in range(3):
+                    block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
+                y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
+                z = [(y[(2*i + 5*j - 1) % (BLOCK_WIDTH_B4 - 1)] + y[2*i + j]) % 16 for i in range(3) for j in range(2)]
+                z = [s_boxes_b4[6 + i][(z[i] + block[(i + 2) % (BLOCK_WIDTH_B4 - 1)]) % 16] for i in range(BLOCK_WIDTH_B4 - 1)]
+                t_0 = (z[0] + z[1] + z[2]) % 16
+                t_0 = (t_0 + block[block_idx - 1]) % 16
+                sbox_out = s_boxes_b4[12][t_0]
+
+                hypotheses[i] = HW[(block[block_idx] + sbox_out) % 16]
+
+    return seeds_indices, location_mask_per_trace, hypotheses[seeds_indices]
+
+def guess_nibble(key_guess: np.ndarray, j: int, traces: np.ndarray, seeds: np.ndarray, correlation_locations: np.ndarray):
+    assert 0 <= j < KEY_WIDTH_B4
+    indices, location_masks, hypotheses = indices_locations_and_hyps_to_use_for_key_nibble(key_guess, j, seeds, traces, correlation_locations)
+
+    selected_traces = traces[location_masks].reshape((seeds[indices].shape[0], correlation_locations.shape[2]))
+    corr = corr_coef(hypotheses, selected_traces)
+    
+    return np.max(corr)
+
+
+
+def main():
+    traces, real_keys, seeds, correlation_locations = load_data()
+
+    reconstructed_keys = np.zeros_like(real_keys)
+    for i in range(reconstructed_keys.shape[0]):
+        print(f"Key {i}: ", end="")
+        for j in range(reconstructed_keys.shape[1]):
+
+            start = time()
+            cpus = 61
+            with multiprocessing.Pool(cpus) as p:
+                pool_results = p.starmap(guess_nibble, zip([reconstructed_keys[i][:j].tolist() + [k] + reconstructed_keys[i][j+1:].tolist() for k in range(16)], [j] * cpus, [traces[i]] * cpus, [seeds[i]] * cpus, [correlation_locations] * cpus))
+
+            best_k = np.argmax(pool_results)
+            reconstructed_keys[i][j] = best_k
+            print(hex(best_k)[2:].upper(), end="")
+
+            print(time() - start)
+            plt.plot(pool_results)
+            plt.xlabel("Key")
+            plt.ylabel("Max correlation across local duration")
+            plt.title(f"Real key nibble: {real_keys[i][j]}")
+            plt.ylim([0, 1])
+            plt.show()
+
+        print()
+        print(f"    vs {"".join([hex(k)[2:].upper() for k in real_keys[i]])}")
+        print(f"{len(real_keys[i][real_keys[i] != reconstructed_keys[i]])} mistakes on {len(real_keys[i])} nibbles.")
+        print()
+
+
+if __name__ == '__main__':
+    main()
