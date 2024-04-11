@@ -212,24 +212,65 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
 
     return correlation_locations
 
-def load_data(traces_path: str, key_path: str, locations_path: str, max_traces: int = None, nr_keys: int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_data(traces_path: str, key_path: str, locations_path: str = "", max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
-    traces_size = Counter([traces_dict[k][0, 0][4][:, 0].shape[0] for k in traces_dict.keys() if k.startswith("data_")]).most_common(1)[0][0]
-    empty_traces = {k for k in traces_dict.keys() if k.startswith("data_") and traces_dict[k][0, 0][4][:, 0].shape[0] != traces_size}
-    traces = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces], axis=0)
-    traces = traces.reshape((nr_keys, -1, traces.shape[1]))
+    inputs_outputs, empty_traces = log_parser.parse(key_path)
 
-    inputs_outputs = log_parser.parse(key_path)
-    real_keys = np.array([inputs_outputs[2 * traces.shape[1] * i + 1][0][0] for i in range(nr_keys)])
+    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2)]
+    unique_keys = []
+    for i, k in enumerate(all_keys):
+        if k not in [k for k, i in unique_keys]:
+            unique_keys.append((k, i)) 
+
+    real_keys = [[int(c, 16) for c in key] for key, i in unique_keys]
+    
+    traces = []
+    seeds  = []
+    for j in range(len(unique_keys) - 1):
+        i1 = unique_keys[j][1]
+        i2 = unique_keys[j + 1][1]
+
+        traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces]))
+        seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces]))
+
+    traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces]))
+    seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces]))
+
+    assert len(traces) == len(seeds)
+    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces, seeds)])
+
+    if locations_path:
+        with open(locations_path, "rb") as r:
+            correlation_locations = pic.load(r)
+        return seeds, traces, real_keys, correlation_locations
+    else:
+        return seeds, traces, real_keys
+
+def load_data_alternating_same_varying(traces_path: str, key_path: str, max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    return None
+    traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
+    inputs_outputs, empty_traces = log_parser.parse(key_path)
+    
+    #traces_size = Counter([traces_dict[k][0, 0][4][:, 0].shape[0] for k in traces_dict.keys() if k.startswith("data_")]).most_common(1)[0][0]
+    #empty_traces = {k for k in traces_dict.keys() if k.startswith("data_") and traces_dict[k][0, 0][4][:, 0].shape[0] != traces_size}
+    traces_varying = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 == 0], axis=0)
+    traces_varying = traces_varying.reshape((1, -1, traces_varying.shape[1]))
+    traces_same = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 != 0], axis=0)
+    traces_same = traces_same.reshape((1, -1, traces_same.shape[1]))
+
+    real_keys = np.array([inputs_outputs[1][0][0]])
     real_keys = np.array([[int(c, 16) for c in key] for key in real_keys])
+    
+    seeds_same = np.array([inputs_outputs[0][0][0]])
+    seeds_same = np.repeat(seeds_same[:, np.newaxis], traces_same[0].shape[0], axis=1)
+    seeds_varying = np.array([inputs_outputs[2 * (int(k[len("data_"):]) - 1)][0][0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 == 0])
+    seeds_varying = seeds_varying.reshape((1, traces_varying.shape[1]))
 
-    seeds = np.array([inputs_outputs[2 * (int(k[len("data_"):]) - 1)][0][0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces])
-    seeds = seeds.reshape((-1, traces.shape[1]))
+    
+    assert traces_same.shape[0] == seeds_same.shape[0]
+    assert traces_same.shape[1] == seeds_same.shape[1]
+    assert traces_varying.shape[0] == seeds_varying.shape[0]
+    assert traces_varying.shape[1] == seeds_varying.shape[1]
 
-    assert traces.shape[0] == seeds.shape[0]
-    assert traces.shape[1] == seeds.shape[1]
-
-    with open(locations_path, "rb") as r:
-        correlation_locations = pic.load(r)
-
-    return seeds, traces, real_keys, correlation_locations
+    return seeds_same, traces_same, seeds_varying, traces_varying, real_keys
+    

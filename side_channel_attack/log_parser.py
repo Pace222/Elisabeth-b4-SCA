@@ -14,11 +14,14 @@ def parse(log_path: str, actual_args_only: bool = True) -> List[Optional[Tuple[T
         - An output is a the string returned by the Arduino.
     """
     inps_outs = []
+    empty_indices = []
     inp = out = None
     ready = False
     with open(log_path, 'r') as log:
         for line in log.readlines():
-            if 'INFO' in line:
+            if 'WARNING' in line:
+                empty_indices.append(int(line[line.index("Acq ") + len("Acq "):line.index("WARNING") - 2]))
+            elif 'INFO' in line:
                 ready = True
                 inp = out = None
             elif ready:
@@ -63,4 +66,4 @@ def parse(log_path: str, actual_args_only: bool = True) -> List[Optional[Tuple[T
             else:
                 inp = out = None
 
-    return inps_outs
+    return inps_outs, empty_indices
