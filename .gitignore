@@ -1,6 +1,11 @@
 .vscode/
 
+acquisition/
 arduino_test/
 build/
 libraries/
 PQ_Kyber/
+other_code/
+
+*.pic
+*.pyc
