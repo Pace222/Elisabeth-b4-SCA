@@ -247,30 +247,39 @@ def load_data(traces_path: str, key_path: str, locations_path: str = "", max_tra
         return seeds, traces, real_keys
 
 def load_data_alternating_same_varying(traces_path: str, key_path: str, max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    return None
     traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
     inputs_outputs, empty_traces = log_parser.parse(key_path)
-    
-    #traces_size = Counter([traces_dict[k][0, 0][4][:, 0].shape[0] for k in traces_dict.keys() if k.startswith("data_")]).most_common(1)[0][0]
-    #empty_traces = {k for k in traces_dict.keys() if k.startswith("data_") and traces_dict[k][0, 0][4][:, 0].shape[0] != traces_size}
-    traces_varying = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 == 0], axis=0)
-    traces_varying = traces_varying.reshape((1, -1, traces_varying.shape[1]))
-    traces_same = np.stack([traces_dict[k][0, 0][4][:, 0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 != 0], axis=0)
-    traces_same = traces_same.reshape((1, -1, traces_same.shape[1]))
 
-    real_keys = np.array([inputs_outputs[1][0][0]])
-    real_keys = np.array([[int(c, 16) for c in key] for key in real_keys])
-    
-    seeds_same = np.array([inputs_outputs[0][0][0]])
-    seeds_same = np.repeat(seeds_same[:, np.newaxis], traces_same[0].shape[0], axis=1)
-    seeds_varying = np.array([inputs_outputs[2 * (int(k[len("data_"):]) - 1)][0][0] for k in traces_dict.keys() if k.startswith("data_") and k not in empty_traces and int(k[len("data_"):]) % 2 == 0])
-    seeds_varying = seeds_varying.reshape((1, traces_varying.shape[1]))
+    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2)]
+    unique_keys = []
+    for i, k in enumerate(all_keys):
+        if k not in [k for k, i in unique_keys]:
+            unique_keys.append((k, i)) 
 
+    real_keys = [np.array([int(c, 16) for c in key]) for key, i in unique_keys]
     
-    assert traces_same.shape[0] == seeds_same.shape[0]
-    assert traces_same.shape[1] == seeds_same.shape[1]
-    assert traces_varying.shape[0] == seeds_varying.shape[0]
-    assert traces_varying.shape[1] == seeds_varying.shape[1]
+    traces_varying = []
+    traces_same = []
+    seeds_varying  = []
+    seeds_same = []
+    for j in range(len(unique_keys) - 1):
+        i1 = unique_keys[j][1]
+        i2 = unique_keys[j + 1][1]
 
+        traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces and i % 2 != 0]))
+        traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces and i % 2 == 0]))
+        seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces and i % 2 != 0]))
+        seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces and i % 2 == 0]))
+
+    traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 != 0]))
+    traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 == 0]))
+    seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 != 0]))
+    seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 == 0]))
+
+    assert len(traces_varying) == len(seeds_varying)
+    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces_varying, seeds_varying)])
+    assert len(traces_same) == len(seeds_same)
+    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces_same, seeds_same)])
+  
     return seeds_same, traces_same, seeds_varying, traces_varying, real_keys
     
