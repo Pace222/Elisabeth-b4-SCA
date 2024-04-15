@@ -216,6 +216,104 @@ void benchmark_test_sbox(uint4_t* output, uint4_t index, uint4_t* input) {
   *output = res;
 }
 
+void benchmark_filter_block_b4_decomposed(uint4_t* filter_el, uint4_t* block) {
+  size_t new_width = BLOCK_WIDTH_B4 - 1;
+  uint4_t x[BLOCK_WIDTH_B4];
+  uint4_t y[new_width];
+  uint4_t z[new_width];
+  uint4_t t[new_width];
+  uint4_t res;
+
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+      x[i] = block[i];
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  for (int i = 0; i < new_width / 2; i++) {
+      x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  for (int i = 0; i < new_width; i++) {
+      y[i] = S_BOXES_B4[i][x[i]];
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  for (int i = 0; i < new_width / 2; i++) {
+      z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
+      z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  for (int i = 0; i < new_width; i++) {
+      z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
+      z[i] = S_BOXES_B4[i + new_width][z[i]];
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  for (int i = 0; i < new_width / 3; i++) {
+      t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
+      t[3*i + 1] = uint4_add(z[3*i + 1], z[(3*i + 3) % new_width]);
+      t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  t[0] = uint4_add(t[0], x[5]);
+  t[1] = uint4_add(t[1], x[4]);
+  t[2] = uint4_add(t[2], x[3]);
+  t[3] = uint4_add(t[3], x[1]);
+  t[4] = uint4_add(t[4], x[0]);
+  t[5] = uint4_add(t[5], x[2]);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+
+  res = x[new_width];
+  for (int i = 0; i < new_width; i++) {
+      res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+  }
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  interrupts();
+
+  *filter_el = res;
+}
+
 #define MAX_MESSAGE_SIZE 64
 
 #define MAX_INPUT_SIZE 32 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
@@ -781,6 +879,23 @@ void scenario_test_sbox() {
   }
 }
 
+void scenario_filter_block_b4_decomposed() {
+    // Format: [0-9A-Fa-f]. arg1 is a round key block. Output is the output of a single block of the filtering function.
+    if (fill_array_from_user_hex(buf_arg, BLOCK_WIDTH, DELIMITER) != BLOCK_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is a round key block (SIZE: 1 + " + String(BLOCK_WIDTH) + " nibbles). Output is the output of a single block of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles).");
+        return;
+    }
+
+    for (int i = 0; i < repeat; i++) {
+      benchmark_filter_block_b4_decomposed(buf_out, buf_arg);
+
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
 void setup() {
   // Initialize serial and wait for port to open.
   Serial.begin(115200);
@@ -860,6 +975,9 @@ void process_input() {
     } else if (choice == "testSBox") {
       // Run a given S-Box to test it.
       scenario_test_sbox();
+    } else if (choice == "10") {
+      // Benchmark single block of filter function with a trigger at each main operation
+      scenario_filter_block_b4_decomposed();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
     }
