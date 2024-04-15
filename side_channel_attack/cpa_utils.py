@@ -222,7 +222,7 @@ def load_data(traces_path: str, key_path: str, locations_path: str = "", max_tra
         if k not in [k for k, i in unique_keys]:
             unique_keys.append((k, i)) 
 
-    real_keys = [[int(c, 16) for c in key] for key, i in unique_keys]
+    real_keys = [np.array([int(c, 16) for c in key]) for key, i in unique_keys]
     
     traces = []
     seeds  = []
