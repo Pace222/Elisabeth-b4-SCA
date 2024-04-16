@@ -88,6 +88,29 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
+void benchmark_protected_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
+  if (r-> mode) return;
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  random_whitened_subset(keyround, key, r);
+  uint4_t res = protected_filter_b4(keyround, r->mode);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
+  interrupts();
+
+  *key_el = res;
+}
+
+
 void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
   noInterrupts();
   //Run the trigger Low to High
@@ -404,16 +427,20 @@ void print_format(int mode, String choice, String arguments, String description)
   Serial.println(str_to_print);
 
   if (choice == "\0") {
-    Serial.println("  0: Benchmark whitening");
-    Serial.println("  1: Benchmark single block of filter function");
-    Serial.println("  2: Benchmark full filter function");
-    Serial.println("  3: Benchmark whitening + full filter function");
-    Serial.println("  4: Benchmark final addition with plaintext (encryption)");
-    Serial.println("  5: Benchmark final subtraction with ciphertext (decryption)");
-    Serial.println("  6: Benchmark complete encryption, single element");
-    Serial.println("  7: Benchmark complete decryption, single element");
-    Serial.println("  8: Benchmark complete encryption, full message");
-    Serial.println("  9: Benchmark complete decryption, full message");
+    Serial.println("  0 : Benchmark whitening");
+    Serial.println("  1 : Benchmark single block of filter function");
+    Serial.println("  2 : Benchmark full filter function");
+    Serial.println("  3 : Benchmark whitening + full filter function");
+    Serial.println("  3p: Benchmark whitening + full filter function with side-channel defenses enabled");
+    Serial.println("  4 : Benchmark final addition with plaintext (encryption)");
+    Serial.println("  5 : Benchmark final subtraction with ciphertext (decryption)");
+    Serial.println("  6 : Benchmark complete encryption, single element");
+    Serial.println("  7 : Benchmark complete decryption, single element");
+    Serial.println("  8 : Benchmark complete encryption, full message");
+    Serial.println("  9 : Benchmark complete decryption, full message");
+    Serial.println("  genRndAES   : Fill a table with random values for faster subsequent lookups with AES");
+    Serial.println("  genRndChacha: Fill a table with random values for faster subsequent lookups with Chacha");
+    Serial.println("  testSBox    : Run a given S-Box to test it");
   }
 }
 
@@ -574,6 +601,23 @@ void scenario_whitening_and_filter() {
 
     for (int i = 0; i < repeat; i++) {
       benchmark_whitening_and_filter(buf_out, buf_arg, chosen_rng);
+
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
+void scenario_protected_whitening_and_filter() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    for (int i = 0; i < repeat; i++) {
+      benchmark_protected_whitening_and_filter(buf_out, buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -833,6 +877,9 @@ void process_input() {
     } else if (choice == "3") {
       // Benchmark whitening + full filter function
       scenario_whitening_and_filter();
+    } else if (choice == "3p") {
+      // Benchmark protected whitening + full filter function
+      scenario_protected_whitening_and_filter();
     } else if (choice == "4") {
       // Benchmark final addition with plaintext (encryption)
       scenario_addition();
