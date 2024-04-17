@@ -230,11 +230,11 @@ def load_data(traces_path: str, key_path: str, locations_path: str = "", max_tra
         i1 = unique_keys[j][1]
         i2 = unique_keys[j + 1][1]
 
-        traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces]))
-        seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces]))
+        traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces]))
+        seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i+1 not in empty_traces]))
 
-    traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces]))
-    seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces]))
+    traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces]))
+    seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces]))
 
     assert len(traces) == len(seeds)
     assert all([t.shape[0] == s.shape[0] for t, s in zip(traces, seeds)])
@@ -266,15 +266,15 @@ def load_data_alternating_same_varying(traces_path: str, key_path: str, max_trac
         i1 = unique_keys[j][1]
         i2 = unique_keys[j + 1][1]
 
-        traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces and i % 2 != 0]))
-        traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i not in empty_traces and i % 2 == 0]))
-        seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces and i % 2 != 0]))
-        seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i not in empty_traces and i % 2 == 0]))
+        traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 != 0]))
+        traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 == 0]))
+        seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 != 0]))
+        seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 == 0]))
 
-    traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 != 0]))
-    traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 == 0]))
-    seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 != 0]))
-    seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i not in empty_traces and i % 2 == 0]))
+    traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces and i % 2 != 0]))
+    traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces and i % 2 == 0]))
+    seeds_varying.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces and i % 2 != 0]))
+    seeds_same.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces and i % 2 == 0]))
 
     assert len(traces_varying) == len(seeds_varying)
     assert all([t.shape[0] == s.shape[0] for t, s in zip(traces_varying, seeds_varying)])
