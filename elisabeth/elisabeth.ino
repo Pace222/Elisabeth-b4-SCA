@@ -88,8 +88,8 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
-void benchmark_protected_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
-  if (r-> mode) return;
+void benchmark_protected_whitening_and_filter_everything(uint4_t* key_el, uint4_t* key, rng* r) {
+  if (r->mode) return;
   uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
@@ -98,7 +98,7 @@ void benchmark_protected_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng
   digitalWrite(TriggerPQ, HIGH);  
 
   random_whitened_subset(keyround, key, r);
-  uint4_t res = protected_filter_b4(keyround, r->mode);
+  uint4_t res = protected_filter_b4_mask_everything(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -110,6 +110,27 @@ void benchmark_protected_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng
   *key_el = res;
 }
 
+void benchmark_protected_whitening_and_filter_only_input(uint4_t* key_el, uint4_t* key, rng* r) {
+  if (r->mode) return;
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  random_whitened_subset(keyround, key, r);
+  uint4_t res = protected_filter_b4_mask_only_input(keyround, r->mode);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
+  interrupts();
+
+  *key_el = res;
+}
 
 void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
   noInterrupts();
@@ -609,7 +630,7 @@ void scenario_whitening_and_filter() {
     }
 }
 
-void scenario_protected_whitening_and_filter() {
+void scenario_protected_whitening_and_filter_everything() {
     // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
     if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
         print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
@@ -617,7 +638,24 @@ void scenario_protected_whitening_and_filter() {
     }
 
     for (int i = 0; i < repeat; i++) {
-      benchmark_protected_whitening_and_filter(buf_out, buf_arg, chosen_rng);
+      benchmark_protected_whitening_and_filter_everything(buf_out, buf_arg, chosen_rng);
+
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
+void scenario_protected_whitening_and_filter_only_input() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    for (int i = 0; i < repeat; i++) {
+      benchmark_protected_whitening_and_filter_only_input(buf_out, buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -879,7 +917,10 @@ void process_input() {
       scenario_whitening_and_filter();
     } else if (choice == "3p") {
       // Benchmark protected whitening + full filter function
-      scenario_protected_whitening_and_filter();
+      scenario_protected_whitening_and_filter_everything();
+    } else if (choice == "3pp") {
+      // Benchmark protected whitening + full filter function
+      scenario_protected_whitening_and_filter_only_input();
     } else if (choice == "4") {
       // Benchmark final addition with plaintext (encryption)
       scenario_addition();

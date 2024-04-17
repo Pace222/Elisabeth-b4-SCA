@@ -25,6 +25,13 @@ void masked_addition_second_order(uint4_t* output_shares, uint4_t* inp1_shares, 
     }
 }
 
+void masked_addition_constant_second_order(uint4_t* output_shares, uint4_t* inp1_shares, uint4_t inp2_constant) {
+    output_shares[0] = uint4_add(inp1_shares[0], inp2_constant);
+    for (int i = 1; i < N_SHARES; i++) {
+        output_shares[i] = inp1_shares[i];
+    }
+}
+
 void masked_sbox_second_order(uint4_t* output_shares, uint4_t* inp_shares, uint4_t* s_box) {
     uint4_t t[0x10];
     uint4_t r = uint4_new(gen_rand());
