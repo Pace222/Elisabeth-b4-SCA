@@ -88,17 +88,16 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
-void benchmark_protected_whitening_and_filter_everything(uint4_t* key_el, uint4_t* key, rng* r) {
-  if (r->mode) return;
-  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+void benchmark_protected_whitening_and_filter_everything(uint4_t key_el[N_SHARES], uint4_t key[][N_SHARES], rng* r) {
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4][N_SHARES];
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
-  random_whitened_subset(keyround, key, r);
-  uint4_t res = protected_filter_b4_mask_everything(keyround, r->mode);
+  protected_random_whitened_subset(keyround, key, r);
+  protected_filter(key_el, keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -106,30 +105,6 @@ void benchmark_protected_whitening_and_filter_everything(uint4_t* key_el, uint4_
   digitalWrite(TriggerPQ, HIGH);
   delayMicroseconds(50);
   interrupts();
-
-  *key_el = res;
-}
-
-void benchmark_protected_whitening_and_filter_only_input(uint4_t* key_el, uint4_t* key, rng* r) {
-  if (r->mode) return;
-  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
-  noInterrupts();
-  //Run the trigger Low to High
-  digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(TRIGGER_DELAY);
-  digitalWrite(TriggerPQ, HIGH);  
-
-  random_whitened_subset(keyround, key, r);
-  uint4_t res = protected_filter_b4_mask_only_input(keyround, r->mode);
-
-  //Run the trigger Low to High
-  digitalWrite(TriggerPQ, LOW);
-  delayMicroseconds(TRIGGER_DELAY);
-  digitalWrite(TriggerPQ, HIGH);
-  delayMicroseconds(50);
-  interrupts();
-
-  *key_el = res;
 }
 
 void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
@@ -509,8 +484,9 @@ struct aes_or_cha_list {
 };
 
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
-uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
+uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE], buf_out_shares[MAX_MESSAGE_SIZE][N_SHARES];
 uint4_t buf_arg[KEY_WIDTH_B4];
+uint4_t buf_shares[KEY_WIDTH_B4][N_SHARES];
 aes_or_cha_list rng_list;
 rng* chosen_rng;
 const rng* rng_refs[MAX_MESSAGE_SIZE];
@@ -637,27 +613,18 @@ void scenario_protected_whitening_and_filter_everything() {
         return;
     }
 
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      init_shares(buf_shares[i], buf_arg[i]);
+    }
     for (int i = 0; i < repeat; i++) {
-      benchmark_protected_whitening_and_filter_everything(buf_out, buf_arg, chosen_rng);
+      benchmark_protected_whitening_and_filter_everything(buf_out_shares[0], buf_shares, chosen_rng);
 
-      Serial.print(buf_out[0], HEX);
-      if (i < repeat - 1) {
-        Serial.print(DELIMITER);
+      Serial.print("[");
+      for (int j = 0; j < N_SHARES; j++) {
+        Serial.print(buf_out_shares[0][j], HEX);
+        Serial.print(";");
       }
-    }
-}
-
-void scenario_protected_whitening_and_filter_only_input() {
-    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
-    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
-        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
-        return;
-    }
-
-    for (int i = 0; i < repeat; i++) {
-      benchmark_protected_whitening_and_filter_only_input(buf_out, buf_arg, chosen_rng);
-
-      Serial.print(buf_out[0], HEX);
+      Serial.print("]");
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
@@ -918,9 +885,6 @@ void process_input() {
     } else if (choice == "3p") {
       // Benchmark protected whitening + full filter function
       scenario_protected_whitening_and_filter_everything();
-    } else if (choice == "3pp") {
-      // Benchmark protected whitening + full filter function
-      scenario_protected_whitening_and_filter_only_input();
     } else if (choice == "4") {
       // Benchmark final addition with plaintext (encryption)
       scenario_addition();
