@@ -29,7 +29,7 @@ uint4_t consume_shares(const uint4_t* shares) {
     return res;
 }
 
-void masked_addition(uint4_t* output_shares, const uint4_t* inp1_shares, const uint4_t* inp2_shares) {
+/*void masked_addition(uint4_t* output_shares, const uint4_t* inp1_shares, const uint4_t* inp2_shares) {
     for (int i = 0; i < N_SHARES; i++) {
         output_shares[i] = uint4_add(inp1_shares[i], inp2_shares[i]);
     }
@@ -40,7 +40,7 @@ void masked_addition_constant(uint4_t* output_shares, const uint4_t* inp1_shares
     for (int i = 1; i < N_SHARES; i++) {
         output_shares[i] = inp1_shares[i];
     }
-}
+}*/
 
 void masked_negation(uint4_t* output_shares, const uint4_t* inp_shares) {
     for (int i = 0; i < N_SHARES; i++) {
