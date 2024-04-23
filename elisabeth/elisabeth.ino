@@ -88,8 +88,8 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
-void benchmark_protected_whitening_and_filter_everything(uint4_t key_el[N_SHARES], uint4_t key[][N_SHARES], rng* r) {
-  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4][N_SHARES];
+void benchmark_protected_whitening_and_filter_everything(packed* key_el, packed* key, rng* r) {
+  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -97,7 +97,7 @@ void benchmark_protected_whitening_and_filter_everything(uint4_t key_el[N_SHARES
   digitalWrite(TriggerPQ, HIGH);  
 
   protected_random_whitened_subset(keyround, key, r);
-  protected_filter(key_el, keyround, r->mode);
+  packed res = protected_filter(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -105,6 +105,8 @@ void benchmark_protected_whitening_and_filter_everything(uint4_t key_el[N_SHARES
   digitalWrite(TriggerPQ, HIGH);
   delayMicroseconds(50);
   interrupts();
+
+  *key_el = res;
 }
 
 void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
@@ -257,7 +259,7 @@ int hex2int(char ch) {
 }
 
 void fill_random_uint4_t(uint4_t* array, size_t length) {
-  for (int i = 0; i < length; i++) {
+  for (size_t i = 0; i < length; i++) {
     array[i] = uint4_new((uint8_t) rand());
   }
 }
@@ -484,9 +486,10 @@ struct aes_or_cha_list {
 };
 
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
-uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE], buf_out_shares[MAX_MESSAGE_SIZE][N_SHARES];
+uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
+packed buf_out_shares[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-uint4_t buf_shares[KEY_WIDTH_B4][N_SHARES];
+packed buf_shares[KEY_WIDTH_B4];
 aes_or_cha_list rng_list;
 rng* chosen_rng;
 const rng* rng_refs[MAX_MESSAGE_SIZE];
@@ -614,16 +617,20 @@ void scenario_protected_whitening_and_filter_everything() {
     }
 
     for (int i = 0; i < KEY_WIDTH; i++) {
-      init_shares(buf_shares[i], buf_arg[i]);
+      buf_shares[i] = init_shares(buf_arg[i]);
     }
     for (int i = 0; i < repeat; i++) {
-      benchmark_protected_whitening_and_filter_everything(buf_out_shares[0], buf_shares, chosen_rng);
+      benchmark_protected_whitening_and_filter_everything(buf_out_shares, buf_shares, chosen_rng);
 
       Serial.print("[");
-      for (int j = 0; j < N_SHARES; j++) {
-        Serial.print(buf_out_shares[0][j], HEX);
-        Serial.print(";");
-      }
+  
+      Serial.print((buf_out_shares[0] & MASK_0) >> 10, HEX);
+      Serial.print(";");
+      Serial.print((buf_out_shares[0] & MASK_1) >> 5, HEX);
+      Serial.print(";");
+      Serial.print((buf_out_shares[0] & MASK_2), HEX);
+      Serial.print(";");
+
       Serial.print("]");
       if (i < repeat - 1) {
         Serial.print(DELIMITER);

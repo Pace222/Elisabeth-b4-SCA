@@ -80,64 +80,53 @@ uint4_t filter_block_b4(const uint4_t* block) {
     return res;
 }
 
-void protected_filter_block_b4_mask_everything(uint4_t* res_shares, const uint4_t block_shares[][N_SHARES]) {
+packed protected_filter_block_b4_mask_everything(const packed* block_shares) {
     // Protection under second order DPA
     size_t new_width = BLOCK_WIDTH_B4 - 1;
 
-    uint4_t x_shares[BLOCK_WIDTH_B4][N_SHARES];
-    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                  // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
-        for (int j = 0; j < N_SHARES; j++) {                                                    //     x[i] = block[i];
-            x_shares[i][j] = block_shares[i][j];                                                //     x[i] = block[i];
-        }                                                                                       //     x[i] = block[i];
-    }                                                                                           // }
+    packed x_shares[BLOCK_WIDTH_B4];
+    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                                                      // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+        x_shares[i] = block_shares[i];                                                                                              //     x[i] = block[i];
+    }                                                                                                                               // }
 
-    uint4_t y_shares[new_width][N_SHARES];
-    uint4_t z_shares[new_width][N_SHARES];
-    uint4_t t_shares[new_width][N_SHARES];
+    packed y_shares[new_width];
+    packed z_shares[new_width];
+    packed t_shares[new_width];
 
     for (int i = 0; i < new_width / 2; i++) {
-        masked_addition(x_shares[2*i + 1], x_shares[2*i + 1], x_shares[2*i]);                   // x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
+        x_shares[2*i + 1] = masked_addition(x_shares[2*i + 1], x_shares[2*i]);                                                      // x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
     }
 
     for (int i = 0; i < new_width; i++) {
-        masked_sbox_second_order(y_shares[i], x_shares[i], S_BOXES_B4[i]);                      // y[i] = S_BOXES_B4[i][x[i]];
+        y_shares[i] = masked_sbox_second_order(x_shares[i], S_BOXES_B4[i]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
     }
 
     for (int i = 0; i < new_width / 2; i++) {
-        masked_addition(z_shares[2*i], y_shares[(2*i + 5) % new_width], y_shares[2*i]);         // z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
-        masked_addition(z_shares[2*i + 1], y_shares[(2*i + 4) % new_width], y_shares[2*i + 1]); // z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
+        z_shares[2*i] = masked_addition(y_shares[(2*i + 5) % new_width], y_shares[2*i]);                                            // z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
+        z_shares[2*i + 1] = masked_addition(y_shares[(2*i + 4) % new_width], y_shares[2*i + 1]);                                    // z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
     }
 
     for (int i = 0; i < new_width; i++) {
-        masked_addition(z_shares[i], z_shares[i], x_shares[(i + 2) % new_width]);               // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
-        masked_sbox_second_order(z_shares[i], z_shares[i], S_BOXES_B4[i + new_width]);          // z[i] = S_BOXES_B4[i + new_width][z[i]];
+        z_shares[i] = masked_addition(z_shares[i], x_shares[(i + 2) % new_width]);                                                  // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
+        z_shares[i] = masked_sbox_second_order(z_shares[i], S_BOXES_B4[i + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
     }
 
     for (int i = 0; i < new_width / 3; i++) {
-        uint4_t tmp_shares[N_SHARES];
-        masked_addition(tmp_shares, z_shares[3*i], z_shares[3*i + 1]);                          // t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
-        masked_addition(t_shares[3*i], tmp_shares, z_shares[3*i + 2]);                          // t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
-
-        masked_addition(t_shares[3*i + 1], z_shares[3*i + 1], z_shares[(3*i + 3) % new_width]); // t[3*i + 1] = uint4_add(z[3*i + 1], z[(3*i + 3) % new_width]);
-
-        masked_addition(tmp_shares, z_shares[3*i + 2], z_shares[(3*i + 3) % new_width]);        // t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
-        masked_addition(t_shares[3*i + 2], tmp_shares, y_shares[3*i]);                          // t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
+        t_shares[3*i] = masked_addition(masked_addition(z_shares[3*i], z_shares[3*i + 1]), z_shares[3*i + 2]);                      // t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
+        t_shares[3*i + 1] = masked_addition(z_shares[3*i + 1], z_shares[(3*i + 3) % new_width]);                                    // t[3*i + 1] = uint4_add(z[3*i + 1], z[(3*i + 3) % new_width]);
+        t_shares[3*i + 2] = masked_addition(masked_addition(z_shares[3*i + 2], z_shares[(3*i + 3) % new_width]), y_shares[3*i]);    // t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
     }
 
-    masked_addition(t_shares[0], t_shares[0], x_shares[5]);                                     // t[0] = uint4_add(t[0], x[5]);
-    masked_addition(t_shares[1], t_shares[1], x_shares[4]);                                     // t[1] = uint4_add(t[1], x[4]);
-    masked_addition(t_shares[2], t_shares[2], x_shares[3]);                                     // t[2] = uint4_add(t[2], x[3]);
-    masked_addition(t_shares[3], t_shares[3], x_shares[1]);                                     // t[3] = uint4_add(t[3], x[1]);
-    masked_addition(t_shares[4], t_shares[4], x_shares[0]);                                     // t[4] = uint4_add(t[4], x[0]);
-    masked_addition(t_shares[5], t_shares[5], x_shares[2]);                                     // t[5] = uint4_add(t[5], x[2]);
+    t_shares[0] = masked_addition(t_shares[0], x_shares[5]);                                                                        // t[0] = uint4_add(t[0], x[5]);
+    t_shares[1] = masked_addition(t_shares[1], x_shares[4]);                                                                        // t[1] = uint4_add(t[1], x[4]);
+    t_shares[2] = masked_addition(t_shares[2], x_shares[3]);                                                                        // t[2] = uint4_add(t[2], x[3]);
+    t_shares[3] = masked_addition(t_shares[3], x_shares[1]);                                                                        // t[3] = uint4_add(t[3], x[1]);
+    t_shares[4] = masked_addition(t_shares[4], x_shares[0]);                                                                        // t[4] = uint4_add(t[4], x[0]);
+    t_shares[5] = masked_addition(t_shares[5], x_shares[2]);                                                                        // t[5] = uint4_add(t[5], x[2]);
 
-    for (int i = 0; i < N_SHARES; i++) {                                                        // res = x[new_width];
-        res_shares[i] = x_shares[new_width][i];                                                 // res = x[new_width];
-    }                                                                                           // res = x[new_width];
-
+    packed res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
     for (int i = 0; i < new_width; i++) {
-        uint4_t tmp_shares[N_SHARES];
-        masked_sbox_second_order(tmp_shares, t_shares[i], S_BOXES_B4[i + 2*new_width]);         // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
-        masked_addition(res_shares, res_shares, tmp_shares);                                    // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+        res_shares = masked_addition(res_shares, masked_sbox_second_order(t_shares[i], S_BOXES_B4[i + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
     }
+    return res_shares;
 }

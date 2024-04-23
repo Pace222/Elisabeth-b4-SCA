@@ -12,6 +12,6 @@ static uint4_t S_BOXES_4[8][16];
 
 void init_sboxes_4();
 uint4_t filter_block_4(const uint4_t*);
-void protected_filter_block_4_mask_everything(uint4_t*, const uint4_t[][N_SHARES]);
+packed protected_filter_block_4_mask_everything(const packed*);
 
 #endif

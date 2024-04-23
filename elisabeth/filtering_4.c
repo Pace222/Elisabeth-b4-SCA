@@ -34,4 +34,6 @@ uint4_t filter_block_4(const uint4_t* block) {
     return uint4_add(second_layer_output, block[BLOCK_WIDTH_4 - 1]);
 }
 
-void protected_filter_block_4_mask_everything(uint4_t* res_shares, const uint4_t block_shares[][N_SHARES]) {}
+packed protected_filter_block_4_mask_everything(const packed* block_shares) {
+    return 0;
+}
