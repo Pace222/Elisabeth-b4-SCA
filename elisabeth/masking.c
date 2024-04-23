@@ -1,8 +1,17 @@
 #include "masking.h"
 #include <stdlib.h>
 
-packed gen_shares() {
-    return rand() & MASK_TOT;
+
+#define RANDOM_TABLE_SIZE 1024
+packed RANDOM_TABLE[RANDOM_TABLE_SIZE];
+size_t random_table_idx = 0;
+#define gen_shares() (RANDOM_TABLE[random_table_idx++] & MASK_TOT)
+
+void generate_random_table() {
+    for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
+        RANDOM_TABLE[i] = rand();
+    }
+    random_table_idx = 0;
 }
 
 packed init_shares(uint4_t value) {

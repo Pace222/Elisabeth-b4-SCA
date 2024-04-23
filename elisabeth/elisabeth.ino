@@ -237,7 +237,7 @@ void benchmark_test_sbox(uint4_t* output, uint4_t index, uint4_t* input) {
   *output = res;
 }
 
-#define MAX_MESSAGE_SIZE 64
+#define MAX_MESSAGE_SIZE 16
 
 #define MAX_INPUT_SIZE 32 + AES_KEYLEN + MAX_MESSAGE_SIZE + KEY_WIDTH_B4
 #define START '<'
@@ -620,6 +620,7 @@ void scenario_protected_whitening_and_filter_everything() {
       buf_shares[i] = init_shares(buf_arg[i]);
     }
     for (int i = 0; i < repeat; i++) {
+      generate_random_table();
       benchmark_protected_whitening_and_filter_everything(buf_out_shares, buf_shares, chosen_rng);
 
       Serial.print("[");
