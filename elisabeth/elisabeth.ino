@@ -616,13 +616,12 @@ void scenario_protected_whitening_and_filter_everything() {
         return;
     }
 
-    for (int i = 0; i < KEY_WIDTH; i++) {
-      buf_shares[i] = init_shares(buf_arg[i]);
-    }
     for (int i = 0; i < repeat; i++) {
       generate_random_table();
+      for (int i = 0; i < KEY_WIDTH; i++) {
+        buf_shares[i] = init_shares(buf_arg[i]);
+      }
       benchmark_protected_whitening_and_filter_everything(buf_out_shares, buf_shares, chosen_rng);
-
       Serial.print("[");
   
       Serial.print((buf_out_shares[0] & MASK_0) >> 10, HEX);
