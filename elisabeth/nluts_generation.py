@@ -3,6 +3,20 @@ import random
 
 from typing import List
 
+def gen_nluts_b4_packed() -> List[List[int]]:
+    nluts_orig = gen_nluts_b4()
+    nluts_packed = []
+    for i in range(18):
+        nlut = []
+        for j in range(0, 16, 4):
+            pack = 0
+            for k in range(4):
+                pack |= nluts_orig[i][j + k] << 5*(3 - k)
+            nlut.append(pack)
+        nluts_packed.append(nlut)
+
+    return nluts_packed
+
 def gen_nluts_b4() -> List[List[int]]:
     str_seed = "Welcome to Gabriel"
     seed = int(hashlib.sha256(str_seed.encode("UTF-8")).hexdigest(), 16)
@@ -38,8 +52,8 @@ def gen_nluts_4() -> List[List[int]]:
 def print_nluts(nluts: List[List[int]]):
     for nlut in nluts:
         print("{", end = "")
-        print(", ".join(["0x{:02X}".format(n) for n in nlut]), end = "")
+        print(", ".join(["0x{:08X}".format(n) for n in nlut]), end = "")
         print("},")
 
 if __name__ == '__main__':
-    print_nluts(gen_nluts_b4())
+    print_nluts(gen_nluts_b4_packed())

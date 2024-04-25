@@ -21,6 +21,6 @@ packed gen_rand();
 void generate_random_table();
 packed init_shares(uint4_t);
 uint4_t consume_shares(packed);
-packed masked_sbox_second_order(packed, const uint4_t*);
+packed masked_sbox_second_order(packed, const uint32_t*);
 
 #endif
