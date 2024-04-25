@@ -623,15 +623,23 @@ void scenario_protected_whitening_and_filter_everything() {
       }
       benchmark_protected_whitening_and_filter_everything(buf_out_shares, buf_shares, chosen_rng);
       Serial.print("[");
-  
       Serial.print((buf_out_shares[0] & MASK_0) >> 10, HEX);
       Serial.print(";");
-      Serial.print((buf_out_shares[0] & MASK_1) >> 5, HEX);
+      Serial.print((buf_out_shares[0] & MASK_1) >> 5,  HEX);
       Serial.print(";");
-      Serial.print((buf_out_shares[0] & MASK_2), HEX);
-      Serial.print(";");
-
+      Serial.print((buf_out_shares[0] & MASK_2),       HEX);
       Serial.print("]");
+
+      for (int i = 0; i < KEY_WIDTH; i++) {
+        Serial.print(" | [");
+        Serial.print((buf_shares[i] & MASK_0) >> 10, HEX);
+        Serial.print(";");
+        Serial.print((buf_shares[i] & MASK_1) >> 5,  HEX);
+        Serial.print(";");
+        Serial.print((buf_shares[i] & MASK_2),       HEX);
+        Serial.print("]");
+      }
+      
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
