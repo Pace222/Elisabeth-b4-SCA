@@ -4,10 +4,13 @@
 #define RANDOM_TABLE_SIZE 2048
 packed RANDOM_TABLE[RANDOM_TABLE_SIZE];
 size_t random_table_idx = 0;
-//#define gen_shares() (RANDOM_TABLE[random_table_idx++] & MASK_TOT)
+
+uint32_t gen_rand() {
+    return RANDOM_TABLE[random_table_idx++];
+}
 
 packed gen_shares() {
-    return RANDOM_TABLE[random_table_idx++] & MASK_TOT;
+    return gen_rand() & MASK_TOT;
 } 
 
 void generate_random_table() {
@@ -28,7 +31,7 @@ uint4_t consume_shares(packed shares) {
 
 packed masked_sbox_second_order(packed inp_shares, const uint4_t* s_box) {
     uint4_t t[0x10];
-    uint4_t r = uint4_new(gen_shares());
+    uint4_t r = uint4_new(gen_rand());
     uint4_t r_prime = uint4_add(r, uint4_neg(uint4_add(SHARE_0(inp_shares), SHARE_1(inp_shares))));
 
     packed output_shares = gen_shares();

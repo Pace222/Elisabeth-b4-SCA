@@ -39,7 +39,7 @@ packed protected_filter(const packed* keyround_shares, int mode) {
     // Split the keyround into blocks of size BLOCK_WIDTH and apply function filter_block for each block
     packed res_key_shares = init_shares(0);                                                            // uint4_t res_key = uint4_new(0);
     int loop_bound = KEYROUND_WIDTH / BLOCK_WIDTH;
-    int start_index = gen_shares() % loop_bound;
+    int start_index = gen_rand() % loop_bound;
     for (int i = 0; i < loop_bound; i++) {
         const packed* block = keyround_shares + BLOCK_WIDTH * ((start_index + i) % loop_bound);
         res_key_shares = masked_addition(res_key_shares, protected_filter_block(block));               // res_key = uint4_add(res_key, filter_block(block));
