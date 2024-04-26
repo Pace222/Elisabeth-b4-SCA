@@ -17,6 +17,17 @@ void generate_random_table() {
     for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
         RANDOM_TABLE[i] = rand();
     }
+    reset_counter();
+}
+
+void generate_null_table() {
+    for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
+        RANDOM_TABLE[i] = 0;
+    }
+    reset_counter();
+}
+
+void reset_counter() {
     random_table_idx = 0;
 }
 

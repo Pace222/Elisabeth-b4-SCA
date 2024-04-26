@@ -107,7 +107,7 @@ uint4_t filter_block_b4(const uint4_t* block) {
     return res;
 }
 
-packed protected_filter_block_b4_mask_everything(const packed* block_shares) {
+packed masked_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
     size_t new_width = BLOCK_WIDTH_B4 - 1;
 
@@ -119,7 +119,130 @@ packed protected_filter_block_b4_mask_everything(const packed* block_shares) {
     packed y_shares[new_width];
     packed z_shares[new_width];
     packed t_shares[new_width];
-    
+    packed res_shares;
+
+    for (int i = 0; i < new_width / 2; i++) {
+        x_shares[2*i + 1] = masked_addition(x_shares[2*i + 1], x_shares[2*i]);                                                      // x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
+    }
+
+    for (int i = 0; i < new_width; i++) {
+        y_shares[i] = masked_sbox_second_order(x_shares[i], S_BOXES_B4_PACKED[i]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
+    }
+
+    for (int i = 0; i < new_width / 2; i++) {
+        z_shares[2*i] = masked_addition(y_shares[(2*i + 5) % new_width], y_shares[2*i]);                                            // z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
+        z_shares[2*i + 1] = masked_addition(y_shares[(2*i + 4) % new_width], y_shares[2*i + 1]);                                    // z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
+    }
+
+    for (int i = 0; i < new_width; i++) {
+        z_shares[i] = masked_addition(z_shares[i], x_shares[(i + 2) % new_width]);                                                  // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
+        z_shares[i] = masked_sbox_second_order(z_shares[i], S_BOXES_B4_PACKED[i + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
+    }
+
+    for (int i = 0; i < new_width / 3; i++) {
+        t_shares[3*i] = masked_addition(masked_addition(z_shares[3*i], z_shares[3*i + 1]), z_shares[3*i + 2]);                      // t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
+        t_shares[3*i + 1] = masked_addition(z_shares[3*i + 1], z_shares[(3*i + 3) % new_width]);                                    // t[3*i + 1] = uint4_add(z[3*i + 1], z[(3*i + 3) % new_width]);
+        t_shares[3*i + 2] = masked_addition(masked_addition(z_shares[3*i + 2], z_shares[(3*i + 3) % new_width]), y_shares[3*i]);    // t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
+    }
+
+    t_shares[0] = masked_addition(t_shares[0], x_shares[5]);                                                                        // t[0] = uint4_add(t[0], x[5]);
+    t_shares[1] = masked_addition(t_shares[1], x_shares[4]);                                                                        // t[1] = uint4_add(t[1], x[4]);
+    t_shares[2] = masked_addition(t_shares[2], x_shares[3]);                                                                        // t[2] = uint4_add(t[2], x[3]);
+    t_shares[3] = masked_addition(t_shares[3], x_shares[1]);                                                                        // t[3] = uint4_add(t[3], x[1]);
+    t_shares[4] = masked_addition(t_shares[4], x_shares[0]);                                                                        // t[4] = uint4_add(t[4], x[0]);
+    t_shares[5] = masked_addition(t_shares[5], x_shares[2]);                                                                        // t[5] = uint4_add(t[5], x[2]);
+
+    res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
+    for (int i = 0; i < new_width; i++) {
+        res_shares = masked_addition(res_shares, masked_sbox_second_order(t_shares[i], S_BOXES_B4_PACKED[i + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+    }
+    return res_shares;
+}
+
+uint4_t shuffled_filter_block_b4(const uint4_t* block) {
+    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    uint4_t x[BLOCK_WIDTH_B4];
+    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+        x[i] = block[i];
+    }
+    uint4_t y[new_width];
+    uint4_t z[new_width];
+    uint4_t t[new_width];
+    uint4_t res;
+
+    int start_index, final_index, loop_bound;
+
+    loop_bound = new_width / 2;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        x[2*final_index + 1] = uint4_add(x[2*final_index + 1], x[2*final_index]);
+    }
+
+    loop_bound = new_width;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        y[final_index] = S_BOXES_B4[final_index][x[final_index]];
+    }
+
+    loop_bound = new_width / 2;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        z[2*final_index] = uint4_add(y[(2*final_index + 5) % new_width], y[2*final_index]);
+        z[2*final_index + 1] = uint4_add(y[(2*final_index + 4) % new_width], y[2*final_index + 1]);
+    }
+
+    loop_bound = new_width;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        z[final_index] = uint4_add(z[final_index], x[(final_index + 2) % new_width]);
+        z[final_index] = S_BOXES_B4[final_index + new_width][z[final_index]];
+    }
+
+    loop_bound = new_width / 3;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        t[3*final_index] = uint4_add(uint4_add(z[3*final_index], z[3*final_index + 1]), z[3*final_index + 2]);
+        t[3*final_index + 1] = uint4_add(z[3*final_index + 1], z[(3*final_index + 3) % new_width]);
+        t[3*final_index + 2] = uint4_add(uint4_add(z[3*final_index + 2], z[(3*final_index + 3) % new_width]), y[3*final_index]);
+    }
+
+    uint8_t x_order[6] = { 5, 4, 3, 1, 0, 2};
+    loop_bound = new_width;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        t[final_index] = uint4_add(t[final_index], x[x_order[final_index]]);
+    }
+
+    res = x[new_width];
+    loop_bound = new_width;
+    start_index = gen_rand() % loop_bound;
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = (start_index + i) % loop_bound;
+        res = uint4_add(res, S_BOXES_B4[final_index + 2*new_width][t[final_index]]);
+    }
+    return res;
+}
+
+packed masked_shuffled_filter_block_b4(const packed* block_shares) {
+    // Protection under second order DPA
+    size_t new_width = BLOCK_WIDTH_B4 - 1;
+
+    packed x_shares[BLOCK_WIDTH_B4];
+    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                                                      // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+        x_shares[i] = block_shares[i];                                                                                              //     x[i] = block[i];
+    }                                                                                                                               // }
+
+    packed y_shares[new_width];
+    packed z_shares[new_width];
+    packed t_shares[new_width];
+    packed res_shares;
+
     int start_index, final_index, loop_bound;
 
     loop_bound = new_width / 2;
@@ -169,9 +292,9 @@ packed protected_filter_block_b4_mask_everything(const packed* block_shares) {
         t_shares[final_index] = masked_addition(t_shares[final_index], x_shares[x_shares_order[final_index]]);
     }
 
+    res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
     loop_bound = new_width;
     start_index = gen_rand() % loop_bound;
-    packed res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         res_shares = masked_addition(res_shares, masked_sbox_second_order(t_shares[final_index], S_BOXES_B4_PACKED[final_index + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);

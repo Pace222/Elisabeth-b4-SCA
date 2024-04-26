@@ -19,6 +19,8 @@ typedef uint32_t packed;
 
 packed gen_rand();
 void generate_random_table();
+void generate_null_table();
+void reset_counter();
 packed init_shares(uint4_t);
 uint4_t consume_shares(packed);
 packed masked_sbox_second_order(packed, const uint32_t*);
