@@ -34,6 +34,14 @@ uint4_t filter_block_4(const uint4_t* block) {
     return uint4_add(second_layer_output, block[BLOCK_WIDTH_4 - 1]);
 }
 
-packed protected_filter_block_4_mask_everything(const packed* block_shares) {
+packed masked_filter_block_4(const packed* block_shares) {
+    return 0;
+}
+
+uint4_t shuffled_filter_block_4(const uint4_t* block) {
+    return 0;
+}
+
+packed masked_shuffled_filter_block_4(const packed* block_shares) {
     return 0;
 }

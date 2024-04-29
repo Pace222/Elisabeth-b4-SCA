@@ -17,6 +17,17 @@ void generate_random_table() {
     for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
         RANDOM_TABLE[i] = rand();
     }
+    reset_counter();
+}
+
+void generate_null_table() {
+    for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
+        RANDOM_TABLE[i] = 0;
+    }
+    reset_counter();
+}
+
+void reset_counter() {
     random_table_idx = 0;
 }
 
@@ -30,21 +41,22 @@ uint4_t consume_shares(packed shares) {
 }
 
 packed masked_sbox_second_order(packed inp_shares, const uint32_t* s_box) {
-    uint4_t t[0x10];
+    uint32_t t[4] = { 0 };
     uint4_t r = uint4_new(gen_rand());
     uint4_t r_prime = uint4_add(r, uint4_neg(uint4_add(SHARE_0(inp_shares), SHARE_1(inp_shares))));
+    uint4_t off_left = 5 * (r_prime % 4), off_right = 20 - off_left;
 
     packed output_shares = gen_shares();
     uint4_t neg_out_summed_4 = uint4_neg(uint4_add(SHARE_0(output_shares), SHARE_1(output_shares)));
-    uint32_t neg_out_summed_32 = (neg_out_summed_4 << 25) | (neg_out_summed_4 << 20) | (neg_out_summed_4 << 15) | (neg_out_summed_4 << 10) | (neg_out_summed_4 << 5) | neg_out_summed_4;
+    uint32_t neg_out_summed_32 = (neg_out_summed_4 << 15) | (neg_out_summed_4 << 10) | (neg_out_summed_4 << 5) | neg_out_summed_4;
     uint4_t inp_2 = SHARE_2(inp_shares);
     
-    for (uint4_t a = 0; a < 0x10; a += 4) {
+    for (uint4_t a = 0, curr = r_prime / 4; a < 0x10; a += 4, curr = (curr + 1) % 4) {
         uint32_t s = (s_box[uint4_add(inp_2, a) / 4] + neg_out_summed_32);
-        for (uint4_t c = 3; c >= 0 && c != 255; c -= 1) {
-            t[uint4_add(r_prime, uint4_add(a, c))] = s & 0b01111;
-            s >>= 5;
-        }
+        t[curr] |= (s >> off_left);
+        t[(curr + 1) % 4] |= (s << off_right) & 0b01111011110111101111;
     }
-    return (output_shares & MASK_0_1) | t[uint4_add(r, inp_2 % 4)];
+
+    uint4_t idx = uint4_add(r, inp_2 % 4);
+    return (output_shares & MASK_0_1) | uint4_new(t[idx / 4] >> (5 * (3 - (idx % 4))));
 }

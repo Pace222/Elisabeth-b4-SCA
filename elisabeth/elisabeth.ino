@@ -88,7 +88,7 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
-void benchmark_protected_whitening_and_filter_everything(packed* key_el, packed* key, rng* r) {
+void benchmark_masked_whitening_and_filter(packed* key_el, packed* key, rng* r) {
   packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
@@ -96,8 +96,50 @@ void benchmark_protected_whitening_and_filter_everything(packed* key_el, packed*
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
-  protected_random_whitened_subset(keyround, key, r);
-  packed res = protected_filter(keyround, r->mode);
+  masked_random_whitened_subset(keyround, key, r);
+  packed res = masked_filter(keyround, r->mode);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
+  interrupts();
+
+  *key_el = res;
+}
+
+void benchmark_shuffled_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  shuffled_random_whitened_subset(keyround, key, r);
+  uint4_t res = shuffled_filter(keyround, r->mode);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
+  interrupts();
+
+  *key_el = res;
+}
+
+void benchmark_masked_shuffled_whitening_and_filter(packed* key_el, packed* key, rng* r) {
+  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  masked_shuffled_random_whitened_subset(keyround, key, r);
+  packed res = masked_shuffled_filter(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -609,36 +651,132 @@ void scenario_whitening_and_filter() {
     }
 }
 
-void scenario_protected_whitening_and_filter_everything() {
+void scenario_masked_whitening_and_filter() {
     // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
     if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
         print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
         return;
     }
 
-    for (int i = 0; i < repeat; i++) {
-      generate_random_table();
-      for (int i = 0; i < KEY_WIDTH; i++) {
-        buf_shares[i] = init_shares(buf_arg[i]);
-      }
-      benchmark_protected_whitening_and_filter_everything(buf_out_shares, buf_shares, chosen_rng);
-      Serial.print("[");
-      Serial.print((buf_out_shares[0] & MASK_0) >> 10, HEX);
-      Serial.print(";");
-      Serial.print((buf_out_shares[0] & MASK_1) >> 5,  HEX);
-      Serial.print(";");
-      Serial.print((buf_out_shares[0] & MASK_2),       HEX);
-      Serial.print("]");
+    generate_random_table();
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      buf_shares[i] = init_shares(buf_arg[i]);
+    }
 
-      for (int i = 0; i < KEY_WIDTH; i++) {
-        Serial.print(" | [");
-        Serial.print((buf_shares[i] & MASK_0) >> 10, HEX);
-        Serial.print(";");
-        Serial.print((buf_shares[i] & MASK_1) >> 5,  HEX);
-        Serial.print(";");
-        Serial.print((buf_shares[i] & MASK_2),       HEX);
-        Serial.print("]");
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      Serial.print(SHARE_0(buf_shares[i]), HEX);
+      Serial.print(SHARE_1(buf_shares[i]), HEX);
+      Serial.print(SHARE_2(buf_shares[i]), HEX);
+    }
+
+    Serial.print("|");
+
+    generate_random_table();
+    for (int i = 0; i < repeat; i++) {
+      reset_counter();
+      benchmark_masked_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
+      Serial.print("[");
+      Serial.print(SHARE_0(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_1(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
+      Serial.print("]");
+      
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
       }
+    }
+}
+
+void scenario_masked_null_whitening_and_filter() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    generate_null_table();
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      buf_shares[i] = init_shares(buf_arg[i]);
+    }
+
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      Serial.print(SHARE_0(buf_shares[i]), HEX);
+      Serial.print(SHARE_1(buf_shares[i]), HEX);
+      Serial.print(SHARE_2(buf_shares[i]), HEX);
+    }
+
+    Serial.print("|");
+
+    generate_null_table();
+    for (int i = 0; i < repeat; i++) {
+      reset_counter();
+      benchmark_masked_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
+      Serial.print("[");
+      Serial.print(SHARE_0(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_1(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
+      Serial.print("]");
+      
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
+void scenario_shuffled_whitening_and_filter() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    generate_random_table();
+    for (int i = 0; i < repeat; i++) {
+      reset_counter();
+      benchmark_shuffled_whitening_and_filter(buf_out, buf_arg, chosen_rng);
+
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
+void scenario_masked_shuffled_whitening_and_filter() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    generate_random_table();
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      buf_shares[i] = init_shares(buf_arg[i]);
+    }
+
+    for (int i = 0; i < KEY_WIDTH; i++) {
+      Serial.print(SHARE_0(buf_shares[i]), HEX);
+      Serial.print(SHARE_1(buf_shares[i]), HEX);
+      Serial.print(SHARE_2(buf_shares[i]), HEX);
+    }
+
+    Serial.print("|");
+
+    generate_random_table();
+    for (int i = 0; i < repeat; i++) {
+      reset_counter();
+      benchmark_masked_shuffled_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
+      Serial.print("[");
+      Serial.print(SHARE_0(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_1(buf_out_shares[0]), HEX);
+      Serial.print(";");
+      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
+      Serial.print("]");
       
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
@@ -897,9 +1035,18 @@ void process_input() {
     } else if (choice == "3") {
       // Benchmark whitening + full filter function
       scenario_whitening_and_filter();
-    } else if (choice == "3p") {
-      // Benchmark protected whitening + full filter function
-      scenario_protected_whitening_and_filter_everything();
+    } else if (choice == "3m") {
+      // Benchmark masked whitening + full filter function
+      scenario_masked_whitening_and_filter();
+    } else if (choice == "3m0") {
+      // Benchmark masked whitening + full filter function with empty masks
+      scenario_masked_null_whitening_and_filter();
+    } else if (choice == "3s") {
+      // Benchmark shuffled whitening + full filter function
+      scenario_shuffled_whitening_and_filter();
+    } else if (choice == "3ms") {
+      // Benchmark masked and shuffled whitening + full filter function
+      scenario_masked_shuffled_whitening_and_filter();
     } else if (choice == "4") {
       // Benchmark final addition with plaintext (encryption)
       scenario_addition();
