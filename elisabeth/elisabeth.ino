@@ -674,11 +674,8 @@ void scenario_masked_whitening_and_filter() {
     for (int i = 0; i < repeat; i++) {
       reset_counter();
       benchmark_masked_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
-      Serial.print("[");
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
-      Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print("]");
       
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
@@ -709,11 +706,8 @@ void scenario_masked_null_whitening_and_filter() {
     for (int i = 0; i < repeat; i++) {
       reset_counter();
       benchmark_masked_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
-      Serial.print("[");
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
-      Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print("]");
       
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
@@ -729,6 +723,15 @@ void scenario_shuffled_whitening_and_filter() {
     }
 
     generate_random_table();
+
+    for (int i = 0; i < 100; i++) {
+      uint32_t r = gen_rand();
+      Serial.print(SHARE_0(r), HEX);
+      Serial.print(SHARE_1(r), HEX);
+    }
+
+    Serial.print("|");
+
     for (int i = 0; i < repeat; i++) {
       reset_counter();
       benchmark_shuffled_whitening_and_filter(buf_out, buf_arg, chosen_rng);
@@ -760,14 +763,49 @@ void scenario_masked_shuffled_whitening_and_filter() {
     Serial.print("|");
 
     generate_random_table();
+
+    uint32_t r = gen_rand();        // whitening loop index
+    Serial.print(SHARE_0(r), HEX);
+    Serial.print(SHARE_1(r), HEX);
+    r = gen_rand();                 // res init 0
+    r = gen_rand();                 // filter loop index
+    Serial.print(SHARE_0(r), HEX);
+    Serial.print(SHARE_1(r), HEX);
+    for (int i = 0; i < KEYROUND_WIDTH_B4 / BLOCK_WIDTH_B4; i++) {
+      // Filter blocks
+      for (int j = 0; j < 2; j++) { // 2 loop indices
+        r = gen_rand();
+        Serial.print(SHARE_0(r), HEX);
+        Serial.print(SHARE_1(r), HEX);
+      }
+      for (int j = 0; j < 12; j++) { // First S-box round
+        r = gen_rand();
+      }
+      for (int j = 0; j < 2; j++) { // 2 loop indices
+        r = gen_rand();
+        Serial.print(SHARE_0(r), HEX);
+        Serial.print(SHARE_1(r), HEX);
+      }
+      for (int j = 0; j < 12; j++) { // Second S-box round
+        r = gen_rand();
+      }
+      for (int j = 0; j < 3; j++) { // 3 loop indices
+        r = gen_rand();
+        Serial.print(SHARE_0(r), HEX);
+        Serial.print(SHARE_1(r), HEX);
+      }
+      for (int j = 0; j < 12; j++) { // Third S-box round
+        r = gen_rand();
+      }
+    }
+
+    Serial.print("|");
+
     for (int i = 0; i < repeat; i++) {
       reset_counter();
       benchmark_masked_shuffled_whitening_and_filter(buf_out_shares, buf_shares, chosen_rng);
-      Serial.print("[");
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
-      Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print("]");
       
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
