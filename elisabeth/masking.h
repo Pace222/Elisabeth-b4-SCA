@@ -1,5 +1,7 @@
 #ifndef MASKING_H
 #define MASKING_H
+#include <stdlib.h>
+
 #include "types.h"
 
 // Packed shares format: _______________________AAAA_BBBB (32-bit word with 2 shares)
@@ -14,12 +16,15 @@ typedef uint32_t packed;
 #define masked_addition_constant(inp1_shares, inp2_constant) (((inp1_shares) + (inp2_constant)) & MASK_TOT)
 #define masked_negation(inp_shares) (((~(inp_shares) & MASK_TOT) + 0b0000100001) & MASK_TOT)
 
-uint32_t gen_rand();
-void generate_random_table();
-void generate_null_table();
-void reset_counter();
-packed init_shares(uint4_t);
+uint32_t get_rand();
 uint4_t consume_shares(packed);
+void init_shares(packed*, uint4_t*, size_t);
+void init_null_shares(packed*, uint4_t*, size_t);
+void generate_masking_random_table();
+void generate_null_masking_random_table();
+void generate_shuffling_random_table();
+void generate_masking_shuffling_random_table();
+void reset_counter();
 packed masked_sbox_first_order(packed, const uint32_t*);
 //packed masked_sbox_second_order(packed, const uint32_t*);
 

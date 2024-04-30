@@ -1,29 +1,126 @@
 #include "masking.h"
-#include <stdlib.h>
+#include <stdio.h>
 
 #define RANDOM_TABLE_SIZE 2048
 packed RANDOM_TABLE[RANDOM_TABLE_SIZE];
 size_t random_table_idx = 0;
 
-uint32_t gen_rand() {
+#define shares_from_value(rand_shares, target_value) (((rand_shares) & MASK_0) | (((target_value) - SHARE_0((rand_shares))) & MASK_1))
+
+uint32_t get_rand() {
     return RANDOM_TABLE[random_table_idx++];
 }
 
-packed gen_shares() {
-    return gen_rand() & MASK_TOT;
-} 
+uint4_t consume_shares(packed shares) {
+    return uint4_add(SHARE_0(shares), SHARE_1(shares));
+}
 
-void generate_random_table() {
-    for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
-        RANDOM_TABLE[i] = rand();
+uint32_t printed_shares(uint32_t s) {
+    printf("%X", SHARE_0(s));
+    printf("%X", SHARE_1(s));
+    return s;
+}
+
+uint32_t printed_rand(uint32_t r) {
+    printf("%02X", r);
+    return r;
+}
+
+void init_shares(packed* packed_values, uint4_t* values, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        packed shares = rand();
+        packed_values[i] = printed_shares(shares_from_value(shares, values[i]));
+    }
+    printf("|");
+    fflush(stdout);
+}
+
+void init_null_shares(packed* packed_values, uint4_t* values, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        packed_values[i] = printed_shares(values[i]);
+    }
+    printf("|");
+    fflush(stdout);
+}
+
+void generate_masking_random_table() {
+    uint32_t r = rand();
+    RANDOM_TABLE[0] = shares_from_value(r, 0);
+    size_t k = 1;
+    for (size_t i = 0; i < 14; i++) {
+        for (size_t j = 0; j < 18; j++) {
+            RANDOM_TABLE[k++] = uint4_new(rand());
+            RANDOM_TABLE[k++] = rand() & MASK_TOT;
+        }
     }
     reset_counter();
 }
 
-void generate_null_table() {
-    for (size_t i = 0; i < RANDOM_TABLE_SIZE; i++) {
-        RANDOM_TABLE[i] = 0;
+void generate_null_masking_random_table() {
+    RANDOM_TABLE[0] = 0;
+    size_t k = 1;
+    for (size_t i = 0; i < 14; i++) {
+        for (size_t j = 0; j < 18; j++) {
+            RANDOM_TABLE[k++] = 0;
+            RANDOM_TABLE[k++] = 0;
+        }
     }
+    reset_counter();
+}
+
+void generate_shuffling_random_table() {
+    RANDOM_TABLE[0] = printed_rand(rand() % 98);
+    RANDOM_TABLE[1] = printed_rand(rand() % 14);
+    size_t k = 2;
+    for (size_t i = 0; i < 14; i++) {
+        // Filter blocks
+        RANDOM_TABLE[k++] = printed_rand(rand() % 3);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        
+        RANDOM_TABLE[k++] = printed_rand(rand() % 3);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        
+        RANDOM_TABLE[k++] = printed_rand(rand() % 2);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+    }
+    printf("|");
+    fflush(stdout);
+
+    reset_counter();
+}
+
+void generate_masking_shuffling_random_table() {
+    RANDOM_TABLE[0] = printed_rand(rand() % 98);
+    uint32_t r = rand();
+    RANDOM_TABLE[1] = shares_from_value(r, 0);
+    RANDOM_TABLE[2] = printed_rand(rand() % 14);
+    size_t k = 3;
+    for (size_t i = 0; i < 14; i++) {
+        // Filter blocks
+        RANDOM_TABLE[k++] = printed_rand(rand() % 3);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        for (int j = 0; j < 6; j++) { // First S-box round
+            RANDOM_TABLE[k++] = uint4_new(rand());
+            RANDOM_TABLE[k++] = rand() & MASK_TOT;
+        }
+        RANDOM_TABLE[k++] = printed_rand(rand() % 3);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        for (int j = 0; j < 6; j++) { // First S-box round
+            RANDOM_TABLE[k++] = uint4_new(rand());
+            RANDOM_TABLE[k++] = rand() & MASK_TOT;
+        }
+        RANDOM_TABLE[k++] = printed_rand(rand() % 2);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        RANDOM_TABLE[k++] = printed_rand(rand() % 6);
+        for (int j = 0; j < 6; j++) { // First S-box round
+            RANDOM_TABLE[k++] = uint4_new(rand());
+            RANDOM_TABLE[k++] = rand() & MASK_TOT;
+        }
+    }
+    printf("|");
+    fflush(stdout);
+
     reset_counter();
 }
 
@@ -31,22 +128,13 @@ void reset_counter() {
     random_table_idx = 0;
 }
 
-packed init_shares(uint4_t value) {
-    packed out_shares = gen_shares();
-    return (out_shares & MASK_0) | ((value - SHARE_0(out_shares)) & MASK_1);
-}
-
-uint4_t consume_shares(packed shares) {
-    return uint4_add(SHARE_0(shares), SHARE_1(shares));
-}
-
 packed masked_sbox_first_order(packed inp_shares, const uint32_t* s_box) {
     uint32_t t[4] = { 0 };
-    uint4_t r = uint4_new(gen_rand());
+    uint4_t r = get_rand();
     uint4_t r_prime = uint4_add(r, uint4_neg(SHARE_0(inp_shares)));
     uint4_t off_left = 5 * (r_prime % 4), off_right = 20 - off_left;
 
-    packed output_shares = gen_shares();
+    packed output_shares = get_rand();
     uint4_t neg_out_summed_4 = uint4_neg(SHARE_0(output_shares));
     uint32_t neg_out_summed_32 = (neg_out_summed_4 << 15) | (neg_out_summed_4 << 10) | (neg_out_summed_4 << 5) | neg_out_summed_4;
     uint4_t inp_1 = SHARE_1(inp_shares);
@@ -63,11 +151,11 @@ packed masked_sbox_first_order(packed inp_shares, const uint32_t* s_box) {
 
 /*packed masked_sbox_second_order(packed inp_shares, const uint32_t* s_box) {
     uint32_t t[4] = { 0 };
-    uint4_t r = uint4_new(gen_rand());
+    uint4_t r = get_rand();
     uint4_t r_prime = uint4_add(r, uint4_neg(uint4_add(SHARE_0(inp_shares), SHARE_1(inp_shares))));
     uint4_t off_left = 5 * (r_prime % 4), off_right = 20 - off_left;
 
-    packed output_shares = gen_shares();
+    packed output_shares = get_rand();
     uint4_t neg_out_summed_4 = uint4_neg(uint4_add(SHARE_0(output_shares), SHARE_1(output_shares)));
     uint32_t neg_out_summed_32 = (neg_out_summed_4 << 15) | (neg_out_summed_4 << 10) | (neg_out_summed_4 << 5) | neg_out_summed_4;
     uint4_t inp_2 = SHARE_2(inp_shares);

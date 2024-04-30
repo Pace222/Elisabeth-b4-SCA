@@ -173,21 +173,21 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     int start_index, final_index, loop_bound;
 
     loop_bound = new_width / 2;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         x[2*final_index + 1] = uint4_add(x[2*final_index + 1], x[2*final_index]);
     }
 
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         y[final_index] = S_BOXES_B4[final_index][x[final_index]];
     }
 
     loop_bound = new_width / 2;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         z[2*final_index] = uint4_add(y[(2*final_index + 5) % new_width], y[2*final_index]);
@@ -195,7 +195,7 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     }
 
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         z[final_index] = uint4_add(z[final_index], x[(final_index + 2) % new_width]);
@@ -203,7 +203,7 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     }
 
     loop_bound = new_width / 3;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         t[3*final_index] = uint4_add(uint4_add(z[3*final_index], z[3*final_index + 1]), z[3*final_index + 2]);
@@ -213,7 +213,7 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
 
     uint8_t x_order[6] = { 5, 4, 3, 1, 0, 2};
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         t[final_index] = uint4_add(t[final_index], x[x_order[final_index]]);
@@ -221,7 +221,7 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
 
     res = x[new_width];
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         res = uint4_add(res, S_BOXES_B4[final_index + 2*new_width][t[final_index]]);
@@ -246,21 +246,21 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     int start_index, final_index, loop_bound;
 
     loop_bound = new_width / 2;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         x_shares[2*final_index + 1] = masked_addition(x_shares[2*final_index + 1], x_shares[2*final_index]);                                                      // x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
     }
 
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         y_shares[final_index] = masked_sbox_first_order(x_shares[final_index], S_BOXES_B4_PACKED[final_index]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
     }
 
     loop_bound = new_width / 2;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         z_shares[2*final_index] = masked_addition(y_shares[(2*final_index + 5) % new_width], y_shares[2*final_index]);                                            // z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
@@ -268,7 +268,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     }
 
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         z_shares[final_index] = masked_addition(z_shares[final_index], x_shares[(final_index + 2) % new_width]);                                                  // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
@@ -276,7 +276,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     }
 
     loop_bound = new_width / 3;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         t_shares[3*final_index] = masked_addition(masked_addition(z_shares[3*final_index], z_shares[3*final_index + 1]), z_shares[3*final_index + 2]);                      // t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
@@ -286,7 +286,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
 
     uint8_t x_shares_order[6] = { 5, 4, 3, 1, 0, 2};
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         t_shares[final_index] = masked_addition(t_shares[final_index], x_shares[x_shares_order[final_index]]);
@@ -294,7 +294,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
 
     res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
     loop_bound = new_width;
-    start_index = gen_rand() % loop_bound;
+    start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         res_shares = masked_addition(res_shares, masked_sbox_first_order(t_shares[final_index], S_BOXES_B4_PACKED[final_index + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);

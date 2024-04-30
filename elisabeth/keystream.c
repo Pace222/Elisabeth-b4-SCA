@@ -23,7 +23,7 @@ void shuffled_random_whitened_subset(uint4_t* keyround, const uint4_t* key, cons
 
     // Apply the whitening mask to the selected subset
     int loop_bound = KEYROUND_WIDTH;
-    int start_index = gen_rand() % loop_bound;
+    int start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         int final_index = (start_index + i) % loop_bound;
         keyround[final_index] = uint4_add(key[r->indices[final_index]], r->whitening[final_index]);
@@ -35,7 +35,7 @@ void masked_shuffled_random_whitened_subset(packed* keyround, const packed* key,
 
     // Apply the whitening mask to the selected subset
     int loop_bound = KEYROUND_WIDTH;
-    int start_index = gen_rand() % loop_bound;
+    int start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         int final_index = (start_index + i) % loop_bound;
         keyround[final_index] = masked_addition_constant(key[r->indices[final_index]], r->whitening[final_index]);
@@ -61,7 +61,7 @@ packed masked_filter(const packed* keyround_shares, int mode) {
     packed (*masked_filter_block) (const packed*) = mode ? masked_filter_block_4 : masked_filter_block_b4;
 
     // Split the keyround into blocks of size BLOCK_WIDTH and apply function filter_block for each block
-    packed res_key_shares = init_shares(0);                                                            // uint4_t res_key = uint4_new(0);
+    packed res_key_shares = get_rand();                                                            // uint4_t res_key = uint4_new(0);
     for (int i = 0; i < KEYROUND_WIDTH; i += BLOCK_WIDTH) {
         res_key_shares = masked_addition(res_key_shares, masked_filter_block(keyround_shares + i)); // res_key = uint4_add(res_key, filter_block(block));
     }
@@ -76,7 +76,7 @@ uint4_t shuffled_filter(const uint4_t* keyround, int mode) {
     // Split the keyround into blocks of size BLOCK_WIDTH and apply function filter_block for each block
     uint4_t res_key = uint4_new(0);
     int loop_bound = KEYROUND_WIDTH / BLOCK_WIDTH;
-    int start_index = gen_rand() % loop_bound;
+    int start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         const uint4_t* block = keyround + BLOCK_WIDTH * ((start_index + i) % loop_bound);
         res_key = uint4_add(res_key, shuffled_filter_block(block));
@@ -90,9 +90,9 @@ packed masked_shuffled_filter(const packed* keyround_shares, int mode) {
     packed (*masked_shuffled_filter_block) (const packed*) = mode ? masked_shuffled_filter_block_4 : masked_shuffled_filter_block_b4;
 
     // Split the keyround into blocks of size BLOCK_WIDTH and apply function filter_block for each block
-    packed res_key_shares = init_shares(0);                                                            // uint4_t res_key = uint4_new(0);
+    packed res_key_shares = get_rand();                                                            // uint4_t res_key = uint4_new(0);
     int loop_bound = KEYROUND_WIDTH / BLOCK_WIDTH;
-    int start_index = gen_rand() % loop_bound;
+    int start_index = get_rand();
     for (int i = 0; i < loop_bound; i++) {
         const packed* block = keyround_shares + BLOCK_WIDTH * ((start_index + i) % loop_bound);
         res_key_shares = masked_addition(res_key_shares, masked_shuffled_filter_block(block));               // res_key = uint4_add(res_key, filter_block(block));
