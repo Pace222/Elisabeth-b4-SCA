@@ -1,24 +1,10 @@
-import typing
-from typing import List, Tuple
+from typing import List
 import pickle as pic
-from collections import Counter
 
 import numpy as np
 #import cupy as np
 import matplotlib.pyplot as plt
-import scipy.io as sio
-
-
-import log_parser
-
-KEYROUND_WIDTH_4 = 60
-KEYROUND_WIDTH_B4 = 98
-
-KEY_WIDTH_4 = 256
-KEY_WIDTH_B4 = 512
-
-BLOCK_WIDTH_4 = 5
-BLOCK_WIDTH_B4 = 7
+from utils import *
 
 HW = [bin(n).count("1") for n in range(0, 128)]
 HD = [[HW[n1 ^ n2] for n2 in range(0, 128)] for n1 in range(0, 128)]
@@ -82,68 +68,6 @@ s_boxes_b4 = [
 ]
 
 s_boxes_b4 = [[s_ & 0x0F for s_ in box] for box in s_boxes_b4]
-
-from ctypes import *
-
-class aes_ctx(Structure):
-    _fields_ = [
-        ("RoundKey", c_uint8 * 176),
-        ("Iv", c_uint8 * 16)
-    ]
-
-class ecrypt_ctx(Structure):
-    _fields_ = [
-        ("input", c_uint32 * 16)
-    ]
-
-class rng(Structure):
-    pass
-
-rng._fields_ = [
-    ("indices", c_uint16 * 512),
-    ("whitening", c_uint8 * 98),
-    ("mode", c_int),
-    ("gen_rand_uniform", CFUNCTYPE(c_uint8, POINTER(rng), POINTER(c_uint8))),
-    ("copy", CFUNCTYPE(None, POINTER(rng), POINTER(rng))),
-    ("next_elem", CFUNCTYPE(None, POINTER(rng)))
-]
-
-class rng_aes(Structure):
-    _fields_ = [
-        ("r", rng),
-        ("ctx", aes_ctx),
-        ("ctr", c_uint8 * 16),
-        ("batch_idx", c_size_t)
-    ]
-
-class rng_cha(Structure):
-    _fields_ = [
-        ("r", rng),
-        ("ctx", ecrypt_ctx),
-        ("batch_idx", c_size_t)
-    ]
-
-lib = CDLL("./py_gen_rng.so")
-
-def aes_random_4(seed: str):
-    r = rng_aes()
-    lib.rng_new_aes(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 1)
-    return list(r.r.indices), list(r.r.whitening)
-    
-def aes_random_b4(seed: str):
-    r = rng_aes()
-    lib.rng_new_aes(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
-    return list(r.r.indices), list(r.r.whitening)
-    
-def chacha_random_4(seed: str):
-    r = rng_cha()
-    lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 1)
-    return list(r.r.indices), list(r.r.whitening)
-    
-def chacha_random_b4(seed: str):
-    r = rng_cha()
-    lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
-    return list(r.r.indices), list(r.r.whitening)
 
 def hypothesis_b4_rws_sboxes_location_hw(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
     indices, whitening = chacha_random_b4(iv)
@@ -212,88 +136,3 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
         pic.dump(correlation_locations, w)
 
     return correlation_locations
-
-def load_data(traces_path: str, key_path: str, locations_path: str = "", max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
-    inputs_outputs, empty_traces = log_parser.parse(key_path)
-
-    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2)]
-    unique_keys = []
-    for i, k in enumerate(all_keys):
-        if k not in [k for k, i in unique_keys]:
-            unique_keys.append((k, i)) 
-
-    real_keys = [np.array([int(c, 16) for c in key]) for key, i in unique_keys]
-    
-    traces = []
-    seeds  = []
-    for j in range(len(unique_keys) - 1):
-        i1 = unique_keys[j][1]
-        i2 = unique_keys[j + 1][1]
-
-        traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces]))
-        seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(i1, i2) if i+1 not in empty_traces]))
-
-    traces.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces]))
-    seeds.append(np.stack([inputs_outputs[2 * i][0][0] for i in range(unique_keys[-1][1], len(all_keys)) if i+1 not in empty_traces]))
-
-    assert len(traces) == len(seeds)
-    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces, seeds)])
-
-    if locations_path:
-        with open(locations_path, "rb") as r:
-            correlation_locations = pic.load(r)
-        return seeds, traces, real_keys, correlation_locations
-    else:
-        return seeds, traces, real_keys
-
-def load_data_alternating_same_varying(traces_path: str, key_path: str, max_traces: typing.Union[int, Tuple[int, int]] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    if max_traces is None:
-        traces_dict = sio.loadmat(traces_path)
-        inputs_outputs, empty_traces = log_parser.parse(key_path)
-    elif type(max_traces) == int:
-        traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(1, max_traces + 1)])
-        inputs_outputs, empty_traces = log_parser.parse(key_path)
-        inputs_outputs = inputs_outputs[:4*max_traces]
-        empty_traces = [t for t in empty_traces if t < max_traces]
-    elif type(max_traces) == tuple:
-        traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces[0] + 1, max_traces[1] + 1)])
-        inputs_outputs, empty_traces = log_parser.parse(key_path)
-        inputs_outputs = inputs_outputs[2*max_traces[0]:2*max_traces[1]]
-        empty_traces = [t for t in empty_traces if max_traces[0] <= t < max_traces[1]]
-    else:
-        raise ValueError("Wrong argument max_traces")
-
-    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2)]
-    unique_keys = []
-    for i, k in enumerate(all_keys):
-        if k not in [k for k, i in unique_keys]:
-            unique_keys.append((k, max_traces[0] + i if type(max_traces) == tuple else i))
-
-    real_keys = [np.array([int(c, 16) for c in key]) for key, i in unique_keys]
-    
-    traces_varying = []
-    traces_same = []
-    seeds_varying  = []
-    seeds_same = []
-    for j in range(len(unique_keys) - 1):
-        i1 = unique_keys[j][1]
-        i2 = unique_keys[j + 1][1]
-
-        traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 != 0]))
-        traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 == 0]))
-        seeds_varying.append(np.stack([inputs_outputs[2 * (i - max_traces[0] if type(max_traces) == tuple else i)][0][0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 != 0]))
-        seeds_same.append(np.stack([inputs_outputs[2 * (i - max_traces[0] if type(max_traces) == tuple else i)][0][0] for i in range(i1, i2) if i+1 not in empty_traces and i % 2 == 0]))
-
-    traces_varying.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], max_traces[1] if type(max_traces) == tuple else len(all_keys)) if i+1 not in empty_traces and i % 2 != 0]))
-    traces_same.append(np.stack([traces_dict["data_" + str(i+1)][0, 0][4][:, 0] for i in range(unique_keys[-1][1], max_traces[1] if type(max_traces) == tuple else len(all_keys)) if i+1 not in empty_traces and i % 2 == 0]))
-    seeds_varying.append(np.stack([inputs_outputs[2 * (i - max_traces[0] if type(max_traces) == tuple else i)][0][0] for i in range(unique_keys[-1][1], max_traces[1] if type(max_traces) == tuple else len(all_keys)) if i+1 not in empty_traces and i % 2 != 0]))
-    seeds_same.append(np.stack([inputs_outputs[2 * (i - max_traces[0] if type(max_traces) == tuple else i)][0][0] for i in range(unique_keys[-1][1], max_traces[1] if type(max_traces) == tuple else len(all_keys)) if i+1 not in empty_traces and i % 2 == 0]))
-
-    assert len(traces_varying) == len(seeds_varying)
-    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces_varying, seeds_varying)])
-    assert len(traces_same) == len(seeds_same)
-    assert all([t.shape[0] == s.shape[0] for t, s in zip(traces_same, seeds_same)])
-  
-    return seeds_same, traces_same, seeds_varying, traces_varying, real_keys
-    
