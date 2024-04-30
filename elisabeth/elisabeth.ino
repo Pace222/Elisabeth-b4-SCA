@@ -1020,6 +1020,8 @@ void setup() {
 
   new_data = 0;
 
+  srand(analogRead(A10));
+
   init_sboxes_4();
   init_sboxes_b4();
 
