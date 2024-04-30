@@ -126,7 +126,7 @@ packed masked_filter_block_b4(const packed* block_shares) {
     }
 
     for (int i = 0; i < new_width; i++) {
-        y_shares[i] = masked_sbox_second_order(x_shares[i], S_BOXES_B4_PACKED[i]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
+        y_shares[i] = masked_sbox_first_order(x_shares[i], S_BOXES_B4_PACKED[i]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
     }
 
     for (int i = 0; i < new_width / 2; i++) {
@@ -136,7 +136,7 @@ packed masked_filter_block_b4(const packed* block_shares) {
 
     for (int i = 0; i < new_width; i++) {
         z_shares[i] = masked_addition(z_shares[i], x_shares[(i + 2) % new_width]);                                                  // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
-        z_shares[i] = masked_sbox_second_order(z_shares[i], S_BOXES_B4_PACKED[i + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
+        z_shares[i] = masked_sbox_first_order(z_shares[i], S_BOXES_B4_PACKED[i + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
     }
 
     for (int i = 0; i < new_width / 3; i++) {
@@ -154,7 +154,7 @@ packed masked_filter_block_b4(const packed* block_shares) {
 
     res_shares = x_shares[new_width];                                                                                        // res = x[new_width];
     for (int i = 0; i < new_width; i++) {
-        res_shares = masked_addition(res_shares, masked_sbox_second_order(t_shares[i], S_BOXES_B4_PACKED[i + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+        res_shares = masked_addition(res_shares, masked_sbox_first_order(t_shares[i], S_BOXES_B4_PACKED[i + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
     }
     return res_shares;
 }
@@ -256,7 +256,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     start_index = gen_rand() % loop_bound;
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
-        y_shares[final_index] = masked_sbox_second_order(x_shares[final_index], S_BOXES_B4_PACKED[final_index]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
+        y_shares[final_index] = masked_sbox_first_order(x_shares[final_index], S_BOXES_B4_PACKED[final_index]);                                                         // y[i] = S_BOXES_B4[i][x[i]];
     }
 
     loop_bound = new_width / 2;
@@ -272,7 +272,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
         z_shares[final_index] = masked_addition(z_shares[final_index], x_shares[(final_index + 2) % new_width]);                                                  // z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
-        z_shares[final_index] = masked_sbox_second_order(z_shares[final_index], S_BOXES_B4_PACKED[final_index + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
+        z_shares[final_index] = masked_sbox_first_order(z_shares[final_index], S_BOXES_B4_PACKED[final_index + new_width]);                                             // z[i] = S_BOXES_B4[i + new_width][z[i]];
     }
 
     loop_bound = new_width / 3;
@@ -297,7 +297,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     start_index = gen_rand() % loop_bound;
     for (int i = 0; i < loop_bound; i++) {
         final_index = (start_index + i) % loop_bound;
-        res_shares = masked_addition(res_shares, masked_sbox_second_order(t_shares[final_index], S_BOXES_B4_PACKED[final_index + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+        res_shares = masked_addition(res_shares, masked_sbox_first_order(t_shares[final_index], S_BOXES_B4_PACKED[final_index + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
     }
     return res_shares;
 }

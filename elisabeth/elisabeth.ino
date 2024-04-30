@@ -666,7 +666,6 @@ void scenario_masked_whitening_and_filter() {
     for (int i = 0; i < KEY_WIDTH; i++) {
       Serial.print(SHARE_0(buf_shares[i]), HEX);
       Serial.print(SHARE_1(buf_shares[i]), HEX);
-      Serial.print(SHARE_2(buf_shares[i]), HEX);
     }
 
     Serial.print("|");
@@ -679,8 +678,6 @@ void scenario_masked_whitening_and_filter() {
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
       Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print(";");
-      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
       Serial.print("]");
       
       if (i < repeat - 1) {
@@ -704,7 +701,6 @@ void scenario_masked_null_whitening_and_filter() {
     for (int i = 0; i < KEY_WIDTH; i++) {
       Serial.print(SHARE_0(buf_shares[i]), HEX);
       Serial.print(SHARE_1(buf_shares[i]), HEX);
-      Serial.print(SHARE_2(buf_shares[i]), HEX);
     }
 
     Serial.print("|");
@@ -717,8 +713,6 @@ void scenario_masked_null_whitening_and_filter() {
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
       Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print(";");
-      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
       Serial.print("]");
       
       if (i < repeat - 1) {
@@ -761,7 +755,6 @@ void scenario_masked_shuffled_whitening_and_filter() {
     for (int i = 0; i < KEY_WIDTH; i++) {
       Serial.print(SHARE_0(buf_shares[i]), HEX);
       Serial.print(SHARE_1(buf_shares[i]), HEX);
-      Serial.print(SHARE_2(buf_shares[i]), HEX);
     }
 
     Serial.print("|");
@@ -774,8 +767,6 @@ void scenario_masked_shuffled_whitening_and_filter() {
       Serial.print(SHARE_0(buf_out_shares[0]), HEX);
       Serial.print(";");
       Serial.print(SHARE_1(buf_out_shares[0]), HEX);
-      Serial.print(";");
-      Serial.print(SHARE_2(buf_out_shares[0]), HEX);
       Serial.print("]");
       
       if (i < repeat - 1) {
