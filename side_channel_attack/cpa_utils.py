@@ -122,7 +122,7 @@ class rng_cha(Structure):
         ("batch_idx", c_size_t)
     ]
 
-lib = CDLL("./py_gen_rng.so")
+lib = CDLL("../elisabeth/py_gen_rng.so")
 
 def aes_random_4(seed: str):
     r = rng_aes()
