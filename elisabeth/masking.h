@@ -14,7 +14,7 @@ typedef uint32_t packed;
 #define masked_addition_constant(inp1_shares, inp2_constant) (((inp1_shares) + (inp2_constant)) & MASK_TOT)
 #define masked_negation(inp_shares) (((~(inp_shares) & MASK_TOT) + 0b0000100001) & MASK_TOT)
 
-packed gen_rand();
+uint32_t gen_rand();
 void generate_random_table();
 void generate_null_table();
 void reset_counter();
