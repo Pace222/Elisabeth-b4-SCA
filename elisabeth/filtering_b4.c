@@ -162,15 +162,22 @@ packed masked_filter_block_b4(const packed* block_shares) {
 uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     size_t new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
-    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
-        x[i] = block[i];
-    }
     uint4_t y[new_width];
     uint4_t z[new_width];
     uint4_t t[new_width];
     uint4_t res;
 
     int start_index, final_index, loop_bound, cmp;
+
+    loop_bound = BLOCK_WIDTH_B4;
+    start_index = get_rand();
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = start_index + i;
+        cmp = final_index >= loop_bound;
+        final_index -= cmp * loop_bound;
+
+        x[final_index] = block[final_index];
+    }
 
     loop_bound = new_width / 2;
     start_index = get_rand();
@@ -253,18 +260,23 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
 packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
     size_t new_width = BLOCK_WIDTH_B4 - 1;
-
     packed x_shares[BLOCK_WIDTH_B4];
-    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                                                      // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
-        x_shares[i] = block_shares[i];                                                                                              //     x[i] = block[i];
-    }                                                                                                                               // }
-
     packed y_shares[new_width];
     packed z_shares[new_width];
     packed t_shares[new_width];
     packed res_shares;
 
     int start_index, final_index, loop_bound, cmp;
+
+    loop_bound = BLOCK_WIDTH_B4;
+    start_index = get_rand();
+    for (int i = 0; i < loop_bound; i++) {
+        final_index = start_index + i;
+        cmp = final_index >= loop_bound;
+        final_index -= cmp * loop_bound;
+        
+        x_shares[final_index] = block_shares[final_index];
+    }
 
     loop_bound = new_width / 2;
     start_index = get_rand();
