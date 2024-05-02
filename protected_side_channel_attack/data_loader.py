@@ -10,12 +10,13 @@ from utils import KEY_WIDTH_B4, NR_SHARES
 import log_parser
 
 class EntireTraceIterator:
-    def __init__(self, traces_path: str, key_path: str, nr_populations: int, nr_scenarios: int, trace_size: int = 850_000, traces_per_division: int = 50_000):
+    def __init__(self, traces_path: str, key_path: str, nr_populations: int, nr_scenarios: int, trace_size: int, traces_per_division: int, parse_output: str):
         self.traces_path = traces_path
         self.key_path = key_path
         self.nr_populations = nr_populations
         self.nr_scenarios = nr_scenarios
         self.trace_size = trace_size
+        self.parse_output = parse_output
 
         self.inputs_outputs, self.empty_traces = log_parser.parse(self.key_path)
         self.step = (self.nr_populations * self.nr_scenarios) * (traces_per_division // (self.nr_populations * self.nr_scenarios))
@@ -53,7 +54,7 @@ class EntireTraceIterator:
         traces     = [[[] for s in range(len(self.target_scenario))] for p in range(len(self.target_pop))]
         seeds      = [[[] for s in range(len(self.target_scenario))] for p in range(len(self.target_pop))]
         key        = [[int(c, 16) for c in inputs_outputs[1][0][0]]]
-        key_shares = [[[] for s in range(len(self.target_scenario))] for p in range(len(self.target_pop))]
+        parsed_output = [[[] for s in range(len(self.target_scenario))] for p in range(len(self.target_pop))]
         
         for pp, p in enumerate(self.target_pop):
             for ss, s in enumerate(self.target_scenario):
@@ -62,19 +63,24 @@ class EntireTraceIterator:
                         seeds[pp][ss].append(inputs_outputs[io + p * (self.nr_scenarios + 1)][0][0])
                         traces[pp][ss].append(traces_dict[f"data_{t + p * (self.nr_scenarios) + s}"][0, 0][4][:, 0])
 
-                        output = inputs_outputs[io + p * (self.nr_scenarios + 1) + s + 1][1]
-                        #keyshare_str = "".join([chr(int(output[i:i+2], 16)) for i in range(0, len(output), 2)]).split('|')[0]
-                        #key_shares[pp][ss].append(np.array([[int(keyshare_str[i], 16), int(keyshare_str[i + 1], 16)] for i in range(0, len(keyshare_str), 2)]))
+                        if self.parse_output == "keyshares":
+                            output = inputs_outputs[io + p * (self.nr_scenarios + 1) + s + 1][1]
+                            keyshare_str = output.split('|')[0]
+                            parsed_output[pp][ss].append(np.array([[int(keyshare_str[i], 16), int(keyshare_str[i + 1], 16)] for i in range(0, len(keyshare_str), 2)]))
                         
                 seeds[pp][ss] = np.array(seeds[pp][ss])
                 traces[pp][ss] = np.stack(traces[pp][ss])
                 assert traces[pp][ss].shape[1] == self.trace_size
-                #key_shares[pp][ss] = np.array(key_shares[pp][ss])
+                parsed_output[pp][ss] = np.array(parsed_output[pp][ss])
         
                 assert seeds[pp][ss].shape[0] == traces[pp][ss].shape[0]
-                #assert key_shares[pp][ss].shape == (KEY_WIDTH_B4, NR_SHARES)
+                if self.parse_output == "keyshares":
+                    assert seeds[pp][ss].shape[0] == parsed_output[pp][ss].shape[0]
+
+                if self.parse_output == "keyshares":
+                    assert parsed_output[pp][ss].shape[1:] == (KEY_WIDTH_B4, NR_SHARES)
                 
         self.curr += 1
         self.start_log += (stop_log - self.start_log)
 
-        return seeds, traces, key, key_shares
+        return seeds, traces, key, parsed_output
