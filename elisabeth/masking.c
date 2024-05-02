@@ -74,6 +74,8 @@ void generate_shuffling_random_table() {
     size_t k = 2;
     for (size_t i = 0; i < 14; i++) {
         // Filter blocks
+        RANDOM_TABLE[k++] = printed_rand(rand() % 7);
+
         RANDOM_TABLE[k++] = printed_rand(rand() % 3);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
         
@@ -98,22 +100,26 @@ void generate_masking_shuffling_random_table() {
     size_t k = 3;
     for (size_t i = 0; i < 14; i++) {
         // Filter blocks
+        RANDOM_TABLE[k++] = printed_rand(rand() % 7);
+
         RANDOM_TABLE[k++] = printed_rand(rand() % 3);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
         for (int j = 0; j < 6; j++) { // First S-box round
             RANDOM_TABLE[k++] = uint4_new(rand());
             RANDOM_TABLE[k++] = rand() & MASK_TOT;
         }
+
         RANDOM_TABLE[k++] = printed_rand(rand() % 3);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
-        for (int j = 0; j < 6; j++) { // First S-box round
+        for (int j = 0; j < 6; j++) { // Second S-box round
             RANDOM_TABLE[k++] = uint4_new(rand());
             RANDOM_TABLE[k++] = rand() & MASK_TOT;
         }
+
         RANDOM_TABLE[k++] = printed_rand(rand() % 2);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
-        for (int j = 0; j < 6; j++) { // First S-box round
+        for (int j = 0; j < 6; j++) { // Third S-box round
             RANDOM_TABLE[k++] = uint4_new(rand());
             RANDOM_TABLE[k++] = rand() & MASK_TOT;
         }
