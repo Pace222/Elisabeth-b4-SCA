@@ -3,6 +3,19 @@ import random
 
 from typing import List
 
+def gen_nluts_b4_mul_shares() -> List[List[int]]:
+    nluts_orig = gen_nluts_b4()
+    nluts = []
+    for i in range(18):
+        nlut = []
+        for j in range(16):
+            for share in range(1, 16):
+                val = (share << 28) | (share * nluts_orig[i][j])
+                nlut.append(val)
+        nluts.append(nlut)
+
+    return nluts
+
 def gen_nluts_b4_packed() -> List[List[int]]:
     nluts_orig = gen_nluts_b4()
     nluts_packed = []
@@ -56,4 +69,4 @@ def print_nluts(nluts: List[List[int]]):
         print("},")
 
 if __name__ == '__main__':
-    print_nluts(gen_nluts_b4_packed())
+    print_nluts(gen_nluts_b4_mul_shares())
