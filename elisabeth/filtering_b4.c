@@ -3,7 +3,7 @@
 #include "filtering_b4.h"
 #include "masking.h"
 
-uint32_t S_BOXES_B4_PACKED[18][4];
+uint32_t S_BOXES_B4_PACKED[18][256];
 
 void init_sboxes_b4() {
     uint8_t s_boxes_8_t[18][16] = {
