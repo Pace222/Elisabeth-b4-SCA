@@ -88,8 +88,8 @@ void benchmark_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng* r) {
   *key_el = res;
 }
 
-void benchmark_masked_whitening_and_filter(add_packed* key_el, add_packed* key, rng* r) {
-  add_packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+void benchmark_masked_whitening_and_filter(packed* key_el, packed* key, rng* r) {
+  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -97,7 +97,7 @@ void benchmark_masked_whitening_and_filter(add_packed* key_el, add_packed* key, 
   digitalWrite(TriggerPQ, HIGH);  
 
   masked_random_whitened_subset(keyround, key, r);
-  add_packed res = masked_filter(keyround, r->mode);
+  packed res = masked_filter(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -130,8 +130,8 @@ void benchmark_shuffled_whitening_and_filter(uint4_t* key_el, uint4_t* key, rng*
   *key_el = res;
 }
 
-void benchmark_masked_shuffled_whitening_and_filter(add_packed* key_el, add_packed* key, rng* r) {
-  add_packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+void benchmark_masked_shuffled_whitening_and_filter(packed* key_el, packed* key, rng* r) {
+  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -139,7 +139,7 @@ void benchmark_masked_shuffled_whitening_and_filter(add_packed* key_el, add_pack
   digitalWrite(TriggerPQ, HIGH);  
 
   masked_shuffled_random_whitened_subset(keyround, key, r);
-  add_packed res = masked_shuffled_filter(keyround, r->mode);
+  packed res = masked_shuffled_filter(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -529,9 +529,9 @@ struct aes_or_cha_list {
 
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
 uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
-add_packed buf_out_shares[MAX_MESSAGE_SIZE];
+packed buf_out_shares[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-add_packed buf_shares[KEY_WIDTH_B4];
+packed buf_shares[KEY_WIDTH_B4];
 aes_or_cha_list rng_list;
 rng* chosen_rng;
 const rng* rng_refs[MAX_MESSAGE_SIZE];
