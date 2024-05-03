@@ -12,10 +12,11 @@ typedef uint32_t add_packed;
 #define SHARE_0(shares) (((shares) & MASK_0) >> 8)
 #define SHARE_1(shares) (((shares) & MASK_1))
 
-// Packed multiplicative shares format: AAAA____________________BBBBBBBB (32-bit word with 1 share and 1 multiplicative share)
+// Packed multiplicative shares format: AAAA_______________________BBBBB (32-bit word with 1 share and 1 multiplicative share)
 typedef uint32_t mul_packed;
+#define MUL_MODULO 17
 #define MUL_MASK_0 0b11110000000000000000000000000000
-#define MUL_MASK_1 0b00000000000000000000000011111111
+#define MUL_MASK_1 0b00000000000000000000000000011111
 #define MUL_SHARE_0(shares) (((shares) & MUL_MASK_0) >> 28)
 #define MUL_SHARE_1(shares) (((shares) & MUL_MASK_1))
 
