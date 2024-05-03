@@ -11,7 +11,7 @@ def gen_nluts_b4_packed() -> List[List[int]]:
         for j in range(0, 16, 4):
             pack = 0
             for k in range(4):
-                pack |= nluts_orig[i][j + k] << 5*(3 - k)
+                pack |= nluts_orig[i][j + k] << 8*(3 - k)
             nlut.append(pack)
         nluts_packed.append(nlut)
 
