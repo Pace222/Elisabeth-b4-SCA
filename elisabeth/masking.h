@@ -25,7 +25,7 @@ void generate_null_masking_random_table();
 void generate_shuffling_random_table();
 void generate_masking_shuffling_random_table();
 void reset_counter();
-packed masked_sbox_first_order(packed, const uint32_t*);
+packed masked_sbox_first_order(packed, const uint8_t[16][16]);
 //packed masked_sbox_second_order(packed, const uint32_t*);
 
 #endif
