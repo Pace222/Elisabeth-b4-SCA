@@ -1,4 +1,5 @@
 .vscode/
+.venv/
 
 acquisition/
 arduino_test/
