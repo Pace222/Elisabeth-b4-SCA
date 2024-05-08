@@ -8,6 +8,7 @@ BLOCK_WIDTH_4 = 5
 BLOCK_WIDTH_B4 = 7
 
 NR_SHARES = 2
+NR_PERMS = 2 + 14*8
 
 from data_loader import *
 from ctypes import *
