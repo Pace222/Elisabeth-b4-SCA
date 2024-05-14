@@ -1,10 +1,10 @@
 import pickle as pic
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.decomposition import IncrementalPCA
 
-from cpa_utils import HW, HD, corr_coef_vectorized
+from cpa_utils import HW, HD, corr_coef, corr_coef_vectorized
 
 
 SIGNAL_STRENGTHS_METHODS = {
@@ -33,8 +33,6 @@ class SignalStrength:
         
     def fit(self, traces: np.ndarray, labels: np.ndarray, num_features: int):
         assert traces.shape[0] == labels.shape[0]
-        unique_labels = np.unique(labels)
-        assert set(unique_labels) == set(range(len(unique_labels)))
 
         if self.sig is None:
             self.sig = self.compute_signal_strength(traces, labels, num_features)
@@ -53,9 +51,22 @@ class SignalStrength:
 
 
 def pca_comp(traces: np.ndarray, labels: np.ndarray, num: int):
-    if num is None:
-        raise ValueError
-    return PCA(n_components=num).fit(traces)
+#    if num is None:
+#        raise ValueError
+    
+    unique_labels = np.unique(labels)
+    
+    m = np.zeros((len(unique_labels), traces.shape[1]), dtype=np.float64)
+    for label in unique_labels:
+        traces_per_label = traces[labels == label]
+
+        m[np.where(unique_labels == label)[0][0]] = np.mean(traces_per_label, axis=0)
+
+    ECM = np.cov(m, rowvar=False)
+    
+    return np.linalg.eigh(ECM)
+
+    #return IncrementalPCA(n_components=num, batch_size=100_000).fit(traces)
 
 def sost_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     unique_labels = np.unique(labels)
@@ -66,16 +77,16 @@ def sost_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     for label in unique_labels:
         traces_per_label = traces[labels == label]
         
-        card_g[label][0] = len(traces_per_label)
-        m[label] = np.mean(traces_per_label, axis=0)
-        v[label] = np.var(traces_per_label.astype(np.float64), axis=0, ddof=1)
+        card_g[np.where(unique_labels == label)[0][0]][0] = len(traces_per_label)
+        m[np.where(unique_labels == label)[0][0]] = np.mean(traces_per_label, axis=0)
+        v[np.where(unique_labels == label)[0][0]] = np.var(traces_per_label.astype(np.float64), axis=0, ddof=1)
 
     f = np.zeros(traces.shape[1], dtype=np.float64)
     for i in range(len(unique_labels)):
         for j in range(i + 1, len(unique_labels)):
-            num = m[i] - m[j]
-            den = np.sqrt(v[i] / card_g[i] + v[j] / card_g[j])
-            f += np.square(num / den)
+            numer = m[i] - m[j]
+            denom = np.sqrt(v[i] / card_g[i] + v[j] / card_g[j])
+            f += np.square(numer / denom)
     
     return f
 
@@ -87,13 +98,13 @@ def snr_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     for label in unique_labels:
         traces_per_label = traces[labels == label]
         
-        m[label] = np.mean(traces_per_label, axis=0)
-        v[label] = np.var(traces_per_label.astype(np.float64), axis=0, ddof=1)
+        m[np.where(unique_labels == label)[0][0]] = np.mean(traces_per_label, axis=0)
+        v[np.where(unique_labels == label)[0][0]] = np.var(traces_per_label.astype(np.float64), axis=0, ddof=1)
     
     return np.mean(np.square(m) - m, axis=0) / np.mean(v, axis=0)
 
 def corr_comp(traces: np.ndarray, labels: np.ndarray, num: int):
-    return corr_coef_vectorized(np.array([HW[lab] for lab in labels]), traces)
+    return corr_coef(np.array([HW[lab] for lab in labels]), traces)
 
 def dom_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     unique_labels = np.unique(labels)
@@ -102,7 +113,7 @@ def dom_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     for label in unique_labels:
         traces_per_label = traces[labels == label]
         
-        m[label] = np.mean(traces_per_label, axis=0)
+        m[np.where(unique_labels == label)[0][0]] = np.mean(traces_per_label, axis=0)
 
     f = np.zeros(traces.shape[1], dtype=np.float64)
     for i in range(len(unique_labels)):
@@ -112,8 +123,11 @@ def dom_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     return f
 
 
-def pca_feat(model: PCA, traces: np.ndarray, num: int):
-    return model.transform(traces)
+def pca_feat(model: Tuple[np.ndarray, np.ndarray], traces: np.ndarray, num: int):
+    evals, evecs = model
+    W = evecs[:, -num:]
+    
+    return traces @ W
 
 def sig_feat(model: np.ndarray, traces: np.ndarray, num: int):
     features = np.argpartition(model, kth=-num)[-num:]
