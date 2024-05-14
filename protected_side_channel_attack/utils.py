@@ -1,3 +1,5 @@
+import plotly.express as px
+
 KEYROUND_WIDTH_4 = 60
 KEYROUND_WIDTH_B4 = 98
 
@@ -72,3 +74,29 @@ def chacha_random_b4(seed: str):
     r = rng_cha()
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
+
+def plot(line: np.ndarray, name: str, title: str, xaxis_title: str, yaxis_title: str, is_t_test: bool = False, showlegend: bool= True, xaxis: dict = {}, yaxis_range: list = []):
+    fig = px.line(line)
+    fig.for_each_trace(lambda t: t.update(name=name))
+    if is_t_test:
+        fig.add_hline(4.5, line_color="red")
+        fig.add_hline(-4.5, line_color="red")
+
+    fig.update_layout(
+        title={
+            "text": title,
+            "x": 0.5,
+            "xanchor": "center",
+            "yanchor": "top"
+        },
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
+        showlegend=showlegend
+    )
+    if len(xaxis) > 0:
+        fig.update_layout(xaxis=xaxis)
+    if len(yaxis_range) > 0:
+        fig.update_layout(yaxis_range=yaxis_range)
+
+    config = {'scrollZoom': True}
+    fig.show(config=config)
