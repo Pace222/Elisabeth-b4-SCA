@@ -87,27 +87,33 @@ for round_idx in range(masks_labels.shape[0]):
 
 def process_trace(seed, round_perm_proba, copy_perm_proba, masks_proba):
     assert round_perm_proba.shape[0] == KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 and copy_perm_proba.shape[1] == BLOCK_WIDTH_B4
-    classifications_per_key_nibble = np.zeros((KEY_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.longfloat)
 
     indices, whitening = chacha_random_b4(seed)
     round_perms = round_perm_proba[:]
-    for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
-        for block_idx in range(BLOCK_WIDTH_B4):
-            classifications = np.full((KEY_WIDTH_B4, len(KEY_ALPHABET), len(KEY_ALPHABET) ** (NR_SHARES - 1)), -np.inf, dtype=np.longfloat)
 
-            copy_perms = copy_perm_proba[round_idx]
-            for round_perm, round_proba in enumerate(round_perms):
-                for copy_perm, copy_proba in enumerate(copy_perms):
-                    permuted_keyround_index = ((round_perm + round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)) * BLOCK_WIDTH_B4 + ((copy_perm + block_idx) % BLOCK_WIDTH_B4)
-                    key_index = indices[permuted_keyround_index]
+    classifications_per_keyround_nibble = np.zeros((KEYROUND_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.longfloat)
+    for target_keyround_index in range(KEYROUND_WIDTH_B4):
+        target_round_idx = target_keyround_index // BLOCK_WIDTH_B4
+        target_block_idx = target_keyround_index % BLOCK_WIDTH_B4
 
-                    for m, mask_shares in enumerate(product(KEY_ALPHABET, repeat=NR_SHARES)):
-                        witness = (np.sum(mask_shares) - whitening[permuted_keyround_index]) % 16
-                        probas = masks_proba[round_idx, block_idx, m]
+        for target_witness in KEY_ALPHABET:
+            classifications_hypotheses = np.full((LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** (NR_SHARES - 1)), -np.inf, dtype=np.longfloat)
 
-                        classifications[key_index, witness, m // len(KEY_ALPHABET)] = round_proba + copy_proba + probas
-            classifications_per_key_nibble += np.nan_to_num(np.logaddexp.reduce(classifications, axis=2), neginf=0)
+            for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+                round_proba = round_perms[(target_round_idx - round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)]
 
+                for block_idx in range(BLOCK_WIDTH_B4):
+                    copy_proba = (target_block_idx - block_idx) % BLOCK_WIDTH_B4
+
+                    for m, mask in enumerate(product(KEY_ALPHABET, repeat=NR_SHARES-1)):
+                        masked_value = (target_witness + whitening[target_keyround_index] - np.sum(mask)) % 16
+                        probas = masks_proba[round_idx, block_idx, len(KEY_ALPHABET) * m + masked_value]
+
+                        classifications_hypotheses[round_idx, block_idx, m] = round_proba + copy_proba + probas
+            classifications_per_keyround_nibble[target_keyround_index, target_witness] = np.logaddexp.reduce(classifications_hypotheses, axis=None)
+
+    classifications_per_key_nibble = np.zeros((KEY_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.longfloat)
+    classifications_per_key_nibble[indices[:KEYROUND_WIDTH_B4]] = classifications_per_keyround_nibble
     return classifications_per_key_nibble
 
 def reconstruct_key(seeds: np.ndarray, round_perm_probas: np.ndarray, copy_perm_probas: np.ndarray, masks_probas: np.ndarray):
