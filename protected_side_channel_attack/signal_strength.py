@@ -2,7 +2,7 @@ import pickle as pic
 from typing import Optional, Callable, Tuple
 
 import numpy as np
-from sklearn.decomposition import IncrementalPCA
+from sklearn.decomposition import PCA
 
 from cpa_utils import HW, HD, corr_coef, corr_coef_vectorized
 
@@ -49,8 +49,10 @@ class SignalStrength:
     def __str__(self) -> str:
         return self.name
 
-
 def pca_comp(traces: np.ndarray, labels: np.ndarray, num: int):
+    return PCA(n_components=num).fit(traces)
+
+def my_pca_comp(traces: np.ndarray, labels: np.ndarray, num: int):
 #    if num is None:
 #        raise ValueError
     
@@ -122,8 +124,10 @@ def dom_comp(traces: np.ndarray, labels: np.ndarray, num: int):
     
     return f
 
-
 def pca_feat(model: Tuple[np.ndarray, np.ndarray], traces: np.ndarray, num: int):
+    return model.transform(traces)
+
+def my_pca_feat(model: Tuple[np.ndarray, np.ndarray], traces: np.ndarray, num: int):
     evals, evecs = model
     W = evecs[:, -num:]
     
