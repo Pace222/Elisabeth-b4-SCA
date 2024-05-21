@@ -134,7 +134,7 @@ void reset_counter() {
     random_table_idx = 0;
 }
 
-packed masked_sbox_first_order(packed inp_shares, const uint8_t s_box[16][16]) {
+packed masked_sbox_first_order(packed inp_shares, const uint4_t s_box[16][16]) {
     packed inp_mask_0 = inp_shares & MASK_0;
     packed inp_mask_1 = inp_shares & MASK_1;
 
