@@ -1,3 +1,4 @@
+import numpy as np
 import plotly.express as px
 
 KEYROUND_WIDTH_4 = 60
@@ -11,6 +12,11 @@ BLOCK_WIDTH_B4 = 7
 
 NR_SHARES = 2
 NR_PERMS = 2 + 14*8
+
+EARLIEST_ROUND = 0
+LATEST_ROUND = 1
+
+KEY_ALPHABET = list(range(16))
 
 from data_loader import *
 from ctypes import *
