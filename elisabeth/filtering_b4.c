@@ -3,7 +3,7 @@
 #include "filtering_b4.h"
 #include "masking.h"
 
-uint8_t S_BOXES_B4_WITH_SHARES[18][16][16];
+uint4_t S_BOXES_B4_WITH_SHARES[18][16][16];
 
 void init_sboxes_b4() {
     uint8_t s_boxes_8_t[18][16] = {
@@ -360,7 +360,7 @@ void init_sboxes_b4() {
     for (int i = 0; i < 18; i++) {
         for (int j = 0; j < 16; j++) {
             for (int k = 0; k < 16; k++) {
-                S_BOXES_B4_WITH_SHARES[i][j][k] = s_boxes_8_t_with_shares[i][j][k];
+                S_BOXES_B4_WITH_SHARES[i][j][k] = uint4_new(s_boxes_8_t_with_shares[i][j][k]);
             }
         }
     }

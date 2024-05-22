@@ -46,25 +46,11 @@ void init_null_shares(packed* packed_values, uint4_t* values, size_t length) {
 void generate_masking_random_table() {
     uint32_t r = rand();
     RANDOM_TABLE[0] = shares_from_value(r, 0);
-    size_t k = 1;
-    for (size_t i = 0; i < 14; i++) {
-        for (size_t j = 0; j < 18; j++) {
-            RANDOM_TABLE[k++] = uint4_new(rand());
-            RANDOM_TABLE[k++] = rand() & MASK_TOT;
-        }
-    }
     reset_counter();
 }
 
 void generate_null_masking_random_table() {
     RANDOM_TABLE[0] = 0;
-    size_t k = 1;
-    for (size_t i = 0; i < 14; i++) {
-        for (size_t j = 0; j < 18; j++) {
-            RANDOM_TABLE[k++] = 0;
-            RANDOM_TABLE[k++] = 0;
-        }
-    }
     reset_counter();
 }
 
@@ -104,25 +90,13 @@ void generate_masking_shuffling_random_table() {
 
         RANDOM_TABLE[k++] = printed_rand(rand() % 3);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
-        for (int j = 0; j < 6; j++) { // First S-box round
-            RANDOM_TABLE[k++] = uint4_new(rand());
-            RANDOM_TABLE[k++] = rand() & MASK_TOT;
-        }
 
         RANDOM_TABLE[k++] = printed_rand(rand() % 3);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
-        for (int j = 0; j < 6; j++) { // Second S-box round
-            RANDOM_TABLE[k++] = uint4_new(rand());
-            RANDOM_TABLE[k++] = rand() & MASK_TOT;
-        }
 
         RANDOM_TABLE[k++] = printed_rand(rand() % 2);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
         RANDOM_TABLE[k++] = printed_rand(rand() % 6);
-        for (int j = 0; j < 6; j++) { // Third S-box round
-            RANDOM_TABLE[k++] = uint4_new(rand());
-            RANDOM_TABLE[k++] = rand() & MASK_TOT;
-        }
     }
     printf("|");
     fflush(stdout);
@@ -134,7 +108,7 @@ void reset_counter() {
     random_table_idx = 0;
 }
 
-packed masked_sbox_first_order(packed inp_shares, const uint8_t s_box[16][16]) {
+packed masked_sbox_first_order(packed inp_shares, const uint4_t s_box[16][16]) {
     packed inp_mask_0 = inp_shares & MASK_0;
     packed inp_mask_1 = inp_shares & MASK_1;
 
