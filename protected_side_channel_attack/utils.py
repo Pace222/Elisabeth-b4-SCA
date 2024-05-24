@@ -18,7 +18,6 @@ LATEST_ROUND = 1
 
 KEY_ALPHABET = list(range(16))
 
-from data_loader import *
 from ctypes import *
 
 class aes_ctx(Structure):
