@@ -138,11 +138,10 @@ def process_trace(seed, rws_perm_proba: np.ndarray, masks_rws_proba: np.ndarray,
         for target_witness in KEY_ALPHABET:
             rws_classifications_hypotheses = np.full((KEYROUND_WIDTH_B4, len(KEY_ALPHABET) ** (NR_SHARES - 1)), -np.inf, dtype=np.longfloat)
             for keyround_idx in range(KEYROUND_WIDTH_B4):
-                rws_proba = rws_perm_proba(target_keyround_index - keyround_idx) % KEYROUND_WIDTH_B4
-
                 if np.argmax(masks_rws_proba[keyround_idx]) not in masks_rws_keep_only[keyround_idx]:
                     continue
 
+                rws_proba = rws_perm_proba[(target_keyround_index - keyround_idx) % KEYROUND_WIDTH_B4]
                 for m, mask in enumerate(product(KEY_ALPHABET, repeat=NR_SHARES-1)):
                     masked_value = (target_witness + whitening[target_keyround_index] - np.sum(mask)) % 16
                     probas = masks_rws_proba[keyround_idx, len(KEY_ALPHABET) * m + masked_value]
@@ -151,17 +150,15 @@ def process_trace(seed, rws_perm_proba: np.ndarray, masks_rws_proba: np.ndarray,
 
             classifications_hypotheses = np.full((LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** (NR_SHARES - 1)), -np.inf, dtype=np.longfloat)
             for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
-                round_proba = round_perm_proba[(target_round_idx - round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)]
-                
                 if np.argmax(copy_perm_proba[round_idx]) not in copy_keep_only[round_idx]:
                     continue
 
+                round_proba = round_perm_proba[(target_round_idx - round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)]
                 for block_idx in range(BLOCK_WIDTH_B4):
-                    copy_proba = copy_perm_proba[round_idx, (target_block_idx - block_idx) % BLOCK_WIDTH_B4]
-
                     if np.argmax(masks_proba[round_idx, block_idx]) not in masks_keep_only[round_idx, block_idx]:
                         continue
 
+                    copy_proba = copy_perm_proba[round_idx, (target_block_idx - block_idx) % BLOCK_WIDTH_B4]
                     for m, mask in enumerate(product(KEY_ALPHABET, repeat=NR_SHARES-1)):
                         masked_value = (target_witness + whitening[target_keyround_index] - np.sum(mask)) % 16
                         probas = masks_proba[round_idx, block_idx, len(KEY_ALPHABET) * m + masked_value]
@@ -191,7 +188,7 @@ def classifications_per_trace(seeds: np.ndarray, rws_perm_probas: np.ndarray, ma
         LIMIT = 5
         per_trace = np.array([process_trace(seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba, rws_keep_only, masks_rws_keep_only, round_keep_only, copy_keep_only, masks_keep_only) for seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba in zip(seeds[:LIMIT], rws_perm_probas[:LIMIT], masks_rws_probas[:LIMIT], round_perm_probas[:LIMIT], copy_perm_probas[:LIMIT], masks_probas[:LIMIT])])
 
-    with open("classifications_per_trace.pic", "wb") as w:
+    with open("per_trace_300000.pic", "wb") as w:
         pic.dump(per_trace, w)
 
     return per_trace
