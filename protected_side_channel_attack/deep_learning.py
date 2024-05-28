@@ -6,10 +6,13 @@ import numpy as np
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Flatten, Dense, Input, Conv1D, AveragePooling1D, BatchNormalization, Activation, add
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 from tensorflow.keras.utils import to_categorical
 
 from utils import *
+
+RWS_SUBTRACE, RWS_SUBKEYWIDTH = np.arange(500, 5500), KEYROUND_WIDTH_B4 // 4
 
 def check_file_exists(file_path):
 	file_path = os.path.normpath(file_path)
@@ -46,28 +49,28 @@ class ResNetSCA:
 
     @staticmethod
     def rws_mask_branch(x, keyround_idx, share_idx):
-        x = Dense(1024, activation='relu', name=f'rws_mask_{keyround_idx}_{share_idx}')(x)
+        x = Dense(512, activation='relu', name=f'rws_mask_{keyround_idx}_{share_idx}')(x)
         x = BatchNormalization()(x)
         x = Dense(len(KEY_ALPHABET), activation="softmax", name=f'rws_mask_{keyround_idx}_{share_idx}_output')(x)
         return x
 
     @staticmethod
     def round_branch(x):
-        x = Dense(1024, activation='relu', name='round_perm')(x)
+        x = Dense(256, activation='relu', name='round_perm')(x)
         x = BatchNormalization()(x)
         x = Dense(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4, activation="softmax", name='round_perm_output')(x)
         return x
 
     @staticmethod
     def block_branch(x, round_idx):
-        x = Dense(1024, activation='relu', name=f'block_perm_{round_idx}')(x)
+        x = Dense(256, activation='relu', name=f'block_perm_{round_idx}')(x)
         x = BatchNormalization()(x)
         x = Dense(BLOCK_WIDTH_B4, activation="softmax", name=f'block_perm_{round_idx}_output')(x)
         return x
     
     @staticmethod
     def mask_branch(x, round_idx, block_idx):
-        x = Dense(1024, activation='relu', name=f'mask_{round_idx}_{block_idx}')(x)
+        x = Dense(512, activation='relu', name=f'mask_{round_idx}_{block_idx}')(x)
         x = BatchNormalization()(x)
         x = Dense(len(KEY_ALPHABET) ** NR_SHARES, activation="softmax", name=f'mask_{round_idx}_{block_idx}_output')(x)
         return x
@@ -77,7 +80,7 @@ class ResNetSCA:
         y = {}        
         y['rws_perm_output'] = to_categorical(Y['rws_perm'], num_classes=KEYROUND_WIDTH_B4).astype(np.int8)
 
-        for keyround_idx in range(KEYROUND_WIDTH_B4):
+        for keyround_idx in range(RWS_SUBKEYWIDTH):
             for share_idx in range(NR_SHARES):
                 y[f'rws_mask_{keyround_idx}_{share_idx}_output'] = to_categorical(Y[f'rws_mask_{keyround_idx}_{share_idx}'], num_classes=len(KEY_ALPHABET)).astype(np.int8)
         return y
@@ -93,17 +96,17 @@ class ResNetSCA:
                 y[f'mask_{round_idx}_{block_idx}_output'] = to_categorical(Y[f'mask_{round_idx}_{block_idx}'], num_classes=len(KEY_ALPHABET) ** NR_SHARES).astype(np.int8)
         return y
 
-    def __init__(self, rws):
-        depth = 37 if rws else 19
+    def __init__(self, rws, epochs, dataset_size, batch_size, depth=19):
+        #depth = 37 if rws else 19
         if (depth - 1) % 18 != 0:
             raise ValueError('depth should be 18n+1 (eg 19, 37, 55 ...)')
         # Start model definition.
         num_filters = 16
         num_res_blocks = int((depth - 1) / 18)
-        inputs = Input(shape=(18500 if rws else 4400, 1))
+        inputs = Input(shape=(len(RWS_SUBTRACE) if rws else 1950, 1))
         x = ResNetSCA.resnet_layer(inputs=inputs)
         # Instantiate the stack of residual units
-        for stack in range(9):
+        for stack in range(8 if rws else 6):
             for res_block in range(num_res_blocks):
                 strides = 1
                 if stack > 0 and res_block == 0:
@@ -130,7 +133,7 @@ class ResNetSCA:
         if rws:
             x_rws = ResNetSCA.rws_branch(x)
             x_rws_masks = []
-            for keyround_idx in range(KEYROUND_WIDTH_B4):
+            for keyround_idx in range(RWS_SUBKEYWIDTH):
                 for share_idx in range(NR_SHARES):
                     x_rws_masks.append(ResNetSCA.rws_mask_branch(x, keyround_idx, share_idx))
             total = [x_rws] + x_rws_masks
@@ -145,47 +148,15 @@ class ResNetSCA:
             total = [x_round] + x_block + x_masks
 
         self.model = Model(inputs, total, name='extract_resnet')
-        optimizer = Adam()
+        optimizer = Adam(learning_rate=ExponentialDecay(initial_learning_rate=0.001, decay_steps=epochs*dataset_size/batch_size, decay_rate=0.9))
         self.model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy']*len(total))
         self.rws = rws
+        self.epochs = epochs
+        self.dataset_size = dataset_size
+        self.batch_size = batch_size
 
-    def prepare_data_dl(self, traces_total, round_perms_labels, copy_perms_labels, masks_labels, rws_perms_labels, rws_masks_labels):
-        if self.rws:
-            X_total = np.concatenate((
-                traces_total[:, 500:19000],
-                ), axis=1) # Size: 18500 features
-            y_total = {"rws_perm": rws_perms_labels}
-            for keyround_idx in range(KEYROUND_WIDTH_B4):
-                for share_idx in range(NR_SHARES):
-                    y_total[f'rws_mask_{keyround_idx}_{share_idx}'] = rws_masks_labels[keyround_idx, share_idx]
-        else:
-            X_total = np.concatenate((
-                traces_total[:, 19350:21250],
-        #          traces_total[:, 23950:24400],
-        #          traces_total[:, 26700:27150],
-        #          traces_total[:, 29450:29900],
-        #          traces_total[:, 31450:35500],
-        #          traces_total[:, 37650:37750],
-        #          traces_total[:, 39750:39850],
-        #          traces_total[:, 42100:42200],
-        #          traces_total[:, 44950:45050],
-        #          traces_total[:, 53350:53450],
-        #          traces_total[:, 53750:53850],
-        #          traces_total[:, 56150:56250],
-                traces_total[:, 61900:61950],
-        #          traces_total[:, 75350:75700],
-        #          traces_total[:, 77500:77800]), axis=1) # Size: 8700 features
-                traces_total[:, 75350:77800]), axis=1) # Size: 4400 features
-
-            y_total = {"round_perm": round_perms_labels}
-            for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
-                y_total[f'block_perm_{round_idx}'] = copy_perms_labels[round_idx]
-                for block_idx in range(BLOCK_WIDTH_B4):
-                    y_total[f'mask_{round_idx}_{block_idx}'] = 16 * masks_labels[round_idx, block_idx, 0] + masks_labels[round_idx, block_idx, 1]
-
-        return X_total, y_total
-
-    def train_model(self, X_profiling, Y_profiling, save_file_name, epochs=150, batch_size=64, validation_split=0.2, early_stopping=1, patience=10):
+    def train_model(self, X_profiling, Y_profiling, save_file_name, validation_split=0.2, early_stopping=1, patience=10):
+        assert X_profiling.shape[0] == self.dataset_size
         check_file_exists(os.path.dirname(save_file_name))
         # Save model calllback
         save_model = ModelCheckpoint(save_file_name, save_best_only=True)
@@ -215,11 +186,47 @@ class ResNetSCA:
             print("Error: model input shape length %d is not expected ..." % len(input_layer_shape))
             sys.exit(-1)
         y = ResNetSCA.rws_multilabel_to_categorical(Y_profiling) if self.rws else ResNetSCA.multilabel_to_categorical(Y_profiling)
-        history = self.model.fit(x=Reshaped_X_profiling, y=y, batch_size=batch_size, verbose = 1, validation_split=validation_split, epochs=epochs, callbacks=callbacks)
+        history = self.model.fit(x=Reshaped_X_profiling, y=y, batch_size=self.batch_size, verbose = 1, validation_split=validation_split, epochs=self.epochs, callbacks=callbacks)
         return history
 
-    def extract_key(X_extraction, save_file_name):
-        model = load_model(save_file_name)
-        Y_extraction = model.predict(X_extraction)
+def prepare_data_dl(rws, traces_total, round_perms_labels, copy_perms_labels, masks_labels, rws_perms_labels, rws_masks_labels):
+    if rws:
+        X_total = np.concatenate((
+            traces_total[:, RWS_SUBTRACE],
+            ), axis=1) # Size: 5000 features
+        y_total = {"rws_perm": rws_perms_labels}
+        for keyround_idx in range(RWS_SUBKEYWIDTH):
+            for share_idx in range(NR_SHARES):
+                y_total[f'rws_mask_{keyround_idx}_{share_idx}'] = rws_masks_labels[keyround_idx, share_idx]
+    else:
+        X_total = np.concatenate((
+            traces_total[:, 19350:21250],
+    #          traces_total[:, 23950:24400],
+    #          traces_total[:, 26700:27150],
+    #          traces_total[:, 29450:29900],
+    #          traces_total[:, 31450:35500],
+    #          traces_total[:, 37650:37750],
+    #          traces_total[:, 39750:39850],
+    #          traces_total[:, 42100:42200],
+    #          traces_total[:, 44950:45050],
+    #          traces_total[:, 53350:53450],
+    #          traces_total[:, 53750:53850],
+    #          traces_total[:, 56150:56250],
+            traces_total[:, 61900:61950]), axis=1) # Size: 1950 features
+    #          traces_total[:, 75350:75700],
+    #          traces_total[:, 77500:77800]), axis=1) # Size: 8700 features
+    #        traces_total[:, 75350:77800]), axis=1) # Size: 4400 features
 
-        return Y_extraction
+        y_total = {"round_perm": round_perms_labels}
+        for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+            y_total[f'block_perm_{round_idx}'] = copy_perms_labels[round_idx]
+            for block_idx in range(BLOCK_WIDTH_B4):
+                y_total[f'mask_{round_idx}_{block_idx}'] = 16 * masks_labels[round_idx, block_idx, 0] + masks_labels[round_idx, block_idx, 1]
+
+    return X_total, y_total
+
+def extract_key(X_extraction, save_file_name):
+    model = load_model(save_file_name)
+    Y_extraction = model.predict(X_extraction)
+
+    return Y_extraction
