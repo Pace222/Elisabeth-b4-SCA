@@ -119,6 +119,33 @@ def get_masks_labels_rws(seeds: np.ndarray, key: np.ndarray, key_shares: np.ndar
 
     return labels
 
+def process_trace_like_paper(seed, rws_perm_proba: np.ndarray, masks_rws_proba: np.ndarray, round_perm_proba: np.ndarray, copy_perm_proba: np.ndarray, masks_proba: np.ndarray):
+    assert round_perm_proba.shape[0] == KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 and copy_perm_proba.shape[1] == BLOCK_WIDTH_B4
+    predicted_key = np.zeros((KEY_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
+
+    masks_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES))), masks_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES)))), axis=0)
+    copy_perm_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4)), copy_perm_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4))), axis=0)
+    
+    predicted_values = np.stack([np.logaddexp.reduce([masks_proba[:, :, len(KEY_ALPHABET) * m + ((k - m) % 16)] for m in KEY_ALPHABET], axis=0) for k in KEY_ALPHABET], axis=2)
+
+    predicted_rounds = np.zeros((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4, BLOCK_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
+    for round_idx in range(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
+        for block_idx in range(BLOCK_WIDTH_B4):
+            for k in KEY_ALPHABET:
+                predicted_rounds[round_idx, block_idx, k] = np.logaddexp.reduce([predicted_values[round_idx, (block_idx - copy_perm) % BLOCK_WIDTH_B4, k] + copy_perm_proba[round_idx, copy_perm] for copy_perm in range(BLOCK_WIDTH_B4)], axis=0)
+
+    predicted_total = np.zeros((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4, BLOCK_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
+    for round_idx in range(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
+        for block_idx in range(BLOCK_WIDTH_B4):
+            for k in KEY_ALPHABET:
+                predicted_total[round_idx, block_idx, k] = np.logaddexp.reduce([predicted_rounds[(round_idx - round_perm) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4), block_idx, k] + round_perm_proba[round_perm] for round_perm in range(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)], axis=0)
+
+    predicted_keyround = np.concatenate(predicted_total, axis=0) # (KEYROUND_WIDTH_B4, KEY_ALPHABET)
+    indices, whitening = chacha_random_b4(seed)
+    predicted_key[indices[:KEYROUND_WIDTH_B4]] = np.array([np.roll(pred, -whi) for pred, whi in zip(predicted_keyround, whitening)])
+
+    return predicted_key
+
 def process_trace(seed, rws_perm_proba: np.ndarray, masks_rws_proba: np.ndarray, round_perm_proba: np.ndarray, copy_perm_proba: np.ndarray, masks_proba: np.ndarray, rws_keep_only: np.ndarray, masks_rws_keep_only: np.ndarray, round_keep_only: np.ndarray, copy_keep_only: np.ndarray, masks_keep_only: np.ndarray):
     assert round_perm_proba.shape[0] == KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 and copy_perm_proba.shape[1] == BLOCK_WIDTH_B4
 
@@ -183,7 +210,20 @@ def process_trace(seed, rws_perm_proba: np.ndarray, masks_rws_proba: np.ndarray,
     classifications_per_key_nibble[indices[:KEYROUND_WIDTH_B4]] = classifications_per_keyround_nibble
     return classifications_per_key_nibble
 
-def classifications_per_trace(seeds: np.ndarray, rws_perm_probas: np.ndarray, masks_rws_probas: np.ndarray, round_perm_probas: np.ndarray, copy_perm_probas: np.ndarray, masks_probas: np.ndarray, rws_keep_only: np.ndarray = None, masks_rws_keep_only: np.ndarray = None, round_keep_only: np.ndarray = None, copy_keep_only: np.ndarray = None, masks_keep_only: np.ndarray = None, parallel: bool = True):
+def classifications_per_trace(per_trace_filepath: str, seeds: np.ndarray, rws_perm_probas: np.ndarray, masks_rws_probas: np.ndarray, round_perm_probas: np.ndarray, copy_perm_probas: np.ndarray, masks_probas: np.ndarray, parallel: bool = True):
+    if parallel:
+        per_trace = np.array(Parallel(n_jobs=-1)(delayed(process_trace_like_paper)(seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba) for seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba in zip(seeds, rws_perm_probas, masks_rws_probas, round_perm_probas, copy_perm_probas, masks_probas)))
+    else:
+        LIMIT = 1000
+        per_trace = np.array([process_trace_like_paper(seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba) for seed, rws_perm_proba, masks_rws_proba, round_perm_proba, copy_perm_proba, masks_proba in zip(seeds[:LIMIT], rws_perm_probas[:LIMIT], masks_rws_probas[:LIMIT], round_perm_probas[:LIMIT], copy_perm_probas[:LIMIT], masks_probas[:LIMIT])])
+
+    with open(per_trace_filepath, "wb") as w:
+        pic.dump(per_trace, w)
+
+    return per_trace
+
+
+def classifications_per_trace_old(per_trace_filepath: str, seeds: np.ndarray, rws_perm_probas: np.ndarray, masks_rws_probas: np.ndarray, round_perm_probas: np.ndarray, copy_perm_probas: np.ndarray, masks_probas: np.ndarray, rws_keep_only: np.ndarray = None, masks_rws_keep_only: np.ndarray = None, round_keep_only: np.ndarray = None, copy_keep_only: np.ndarray = None, masks_keep_only: np.ndarray = None, parallel: bool = True):
     if rws_keep_only is None:
         rws_keep_only = np.arange(rws_perm_probas.shape[1])
     if masks_rws_keep_only is None:
