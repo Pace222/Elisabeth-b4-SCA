@@ -81,53 +81,60 @@ def b4_train(sig_strength: SignalStrength, n_feat: int, traces_train: np.ndarray
 
     return gaussian_est
 
-def get_masks_labels(seeds: np.ndarray, key: np.ndarray, key_shares: np.ndarray, round_perms: np.ndarray = None, copy_perms: np.ndarray = None):
-    if round_perms is None or copy_perms is None:
+def get_rws_masks_and_round_masks(seeds: np.ndarray, key: np.ndarray, key_shares: np.ndarray, rws_perms: np.ndarray = None, round_perms: np.ndarray = None, copy_perms: np.ndarray = None):
+    if rws_perms is None or round_perms is None or copy_perms is None:
+        rws_perms = np.zeros((seeds.shape[0]), dtype=int)
         round_perms = np.zeros((seeds.shape[0]), dtype=int)
         copy_perms = np.zeros((seeds.shape[0], LATEST_ROUND - EARLIEST_ROUND), dtype=int)
-    labels = np.zeros((LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, NR_SHARES, seeds.shape[0]), dtype=int)
+    rws_masks = np.zeros((KEYROUND_WIDTH_B4, NR_SHARES, seeds.shape[0]), dtype=int)
+    round_masks = np.zeros((LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, NR_SHARES, seeds.shape[0]), dtype=int)
 
-    for i, (seed, key_share, round_perm, copy_perm) in enumerate(zip(seeds, key_shares, round_perms, copy_perms)):
+    for i, (seed, key_share, rws_perm, round_perm, copy_perm) in enumerate(zip(seeds, key_shares, rws_perms, round_perms, copy_perms)):
         indices, whitening = chacha_random_b4(seed)
-
-        for round_idx, copy_p in zip(range(EARLIEST_ROUND, LATEST_ROUND), copy_perm):
-            for block_idx in range(BLOCK_WIDTH_B4):
-                permuted_keyround_index = ((round_perm + round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)) * BLOCK_WIDTH_B4 + ((copy_p + block_idx) % BLOCK_WIDTH_B4)
-                key_index = indices[permuted_keyround_index]
-
-                assert np.sum(key_share[key_index]) % 16 == key[key_index]
-                labels[round_idx, block_idx, :-1, i] = key_share[key_index, :-1]    
-                labels[round_idx, block_idx, -1, i] = (key_share[key_index, -1] + whitening[permuted_keyround_index]) % 16
-
-    return labels
-
-def get_masks_labels_rws(seeds: np.ndarray, key: np.ndarray, key_shares: np.ndarray, rws_perms: np.ndarray = None):
-    if rws_perms is None:
-        rws_perms = np.zeros((seeds.shape[0]), dtype=int)
-    labels = np.zeros((KEYROUND_WIDTH_B4, NR_SHARES, seeds.shape[0]), dtype=int)
-
-    for i, (seed, key_share, rws_perm) in enumerate(zip(seeds, key_shares, rws_perms)):
-        indices, whitening = chacha_random_b4(seed)
-
         for keyround_index in range(KEYROUND_WIDTH_B4):
             permuted_keyround_index = (rws_perm + keyround_index) % KEYROUND_WIDTH_B4
             key_index = indices[permuted_keyround_index]
 
             assert np.sum(key_share[key_index]) % 16 == key[key_index]
-            labels[keyround_index, :-1, i] = key_share[key_index, :-1]
-            labels[keyround_index, -1, i] = (key_share[key_index, -1] + whitening[permuted_keyround_index]) % 16
+            rws_masks[keyround_index, :-1, i] = key_share[key_index, :-1]
+            rws_masks[keyround_index, -1, i] = (key_share[key_index, -1] + whitening[permuted_keyround_index]) % 16
 
-    return labels
+            round_idx = keyround_index // BLOCK_WIDTH_B4
+            block_idx = keyround_index % BLOCK_WIDTH_B4
+            if not (EARLIEST_ROUND <= round_idx < LATEST_ROUND):
+                continue
+            copy_p = copy_perm[round_idx]
+            permuted_keyround_index = ((round_perm + round_idx) % (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4)) * BLOCK_WIDTH_B4 + ((copy_p + block_idx) % BLOCK_WIDTH_B4)
+            key_index = indices[permuted_keyround_index]
+
+            assert np.sum(key_share[key_index]) % 16 == key[key_index]
+            round_masks[round_idx, block_idx, :-1, i] = key_share[key_index, :-1]    
+            round_masks[round_idx, block_idx, -1, i] = (key_share[key_index, -1] + whitening[permuted_keyround_index]) % 16
+    return rws_masks, round_masks
+
+def get_all_labels(seeds: np.ndarray, key: np.ndarray, log_output: np.ndarray):
+    keyshares, perms = log_output
+    rws_perms_labels = perms[:, 0]
+    round_perms_labels = perms[:, 1]
+    copy_perms_labels = perms[:, 2::8].T
+    rws_masks_labels, round_masks_labels = get_rws_masks_and_round_masks(seeds, key, keyshares, rws_perms_labels, round_perms_labels, copy_perms_labels.T)
+    
+    return rws_perms_labels, rws_masks_labels, round_perms_labels, copy_perms_labels, round_masks_labels
 
 def process_trace(seed, round_perm_proba: np.ndarray, copy_perm_proba: np.ndarray, masks_proba: np.ndarray):
-    assert round_perm_proba.shape[0] == KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 and copy_perm_proba.shape[1] == BLOCK_WIDTH_B4
+    assert round_perm_proba.shape == (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4,) and copy_perm_proba.shape == (LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4) and (masks_proba.shape == (LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES) or masks_proba.shape == (LATEST_ROUND - EARLIEST_ROUND, BLOCK_WIDTH_B4, NR_SHARES, len(KEY_ALPHABET)))
     predicted_key = np.zeros((KEY_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
 
-    masks_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES))), masks_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES)))), axis=0)
-    copy_perm_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4)), copy_perm_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4))), axis=0)
-    
-    predicted_values = np.stack([np.logaddexp.reduce([masks_proba[:, :, len(KEY_ALPHABET) * m + ((k - m) % 16)] for m in KEY_ALPHABET], axis=0) for k in KEY_ALPHABET], axis=-1)
+    if masks_proba.ndim == 3:
+        masks_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES))), masks_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4, len(KEY_ALPHABET) ** NR_SHARES), np.log(1/(len(KEY_ALPHABET) ** NR_SHARES)))), axis=0)
+        predicted_values = np.stack([np.logaddexp.reduce([masks_proba[:, :, len(KEY_ALPHABET) * m + ((k - m) % 16)] for m in KEY_ALPHABET], axis=0) for k in KEY_ALPHABET], axis=-1)
+    elif masks_proba.ndim == 4:
+        masks_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4, NR_SHARES, len(KEY_ALPHABET)), np.log(1/len(KEY_ALPHABET))), masks_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4, NR_SHARES, len(KEY_ALPHABET)), np.log(1/len(KEY_ALPHABET)))), axis=0)
+        predicted_values = np.stack([np.logaddexp.reduce([masks_proba[:, :, 0, m] + masks_proba[:, :, 1, ((k - m) % 16)] for m in KEY_ALPHABET], axis=0) for k in KEY_ALPHABET], axis=-1)
+    else:
+        raise ValueError
 
+    copy_perm_proba = np.concatenate((np.full((EARLIEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4)), copy_perm_proba, np.full((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - LATEST_ROUND, BLOCK_WIDTH_B4), np.log(1/BLOCK_WIDTH_B4))), axis=0)
     predicted_rounds = np.zeros((KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4, BLOCK_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
     for round_idx in range(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
         for block_idx in range(BLOCK_WIDTH_B4):
@@ -159,7 +166,7 @@ def classifications_per_trace(per_trace_filepath: str, seeds: np.ndarray, round_
     return per_trace
 
 def rws_process_trace(seed, rws_perm_proba: np.ndarray, rws_masks_proba: np.ndarray):
-    assert rws_perm_proba.shape[0] == KEYROUND_WIDTH_B4
+    assert rws_perm_proba.shape == (KEYROUND_WIDTH_B4,) and rws_masks_proba.shape == (KEYROUND_WIDTH_B4, NR_SHARES, len(KEY_ALPHABET))
     predicted_key = np.zeros((KEY_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
 
     rws_masks_proba = np.concatenate((rws_masks_proba, np.full((KEYROUND_WIDTH_B4 - rws_masks_proba.shape[0], NR_SHARES, len(KEY_ALPHABET)), np.log(1/len(KEY_ALPHABET)))), axis=0)
@@ -168,8 +175,8 @@ def rws_process_trace(seed, rws_perm_proba: np.ndarray, rws_masks_proba: np.ndar
 
     predicted_keyround = np.zeros((KEYROUND_WIDTH_B4, len(KEY_ALPHABET)), dtype=np.float64)
     for keyround_idx in range(KEYROUND_WIDTH_B4):
-            for k in KEY_ALPHABET:
-                predicted_keyround[keyround_idx, k] = np.logaddexp.reduce([predicted_values[(keyround_idx - rws_perm) % KEYROUND_WIDTH_B4, k] + rws_perm_proba[rws_perm] for rws_perm in range(KEYROUND_WIDTH_B4)], axis=0)
+        for k in KEY_ALPHABET:
+            predicted_keyround[keyround_idx, k] = np.logaddexp.reduce([predicted_values[(keyround_idx - rws_perm) % KEYROUND_WIDTH_B4, k] + rws_perm_proba[rws_perm] for rws_perm in range(KEYROUND_WIDTH_B4)], axis=0)
 
     indices, whitening = chacha_random_b4(seed)
     predicted_key[indices[:KEYROUND_WIDTH_B4]] = np.array([np.roll(pred, -whi) for pred, whi in zip(predicted_keyround, whitening)])

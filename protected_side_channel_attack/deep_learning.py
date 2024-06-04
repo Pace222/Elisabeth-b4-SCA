@@ -3,16 +3,90 @@ import sys
 
 import numpy as np
 
+path = r"C:\Users\iot-user\miniconda3\envs\tf-gpu\Lib\site-packages\nvidia\cudnn\bin"
+os.environ['PATH'] += ';'+path
+#import tensorflow as tf
+#from tensorflow.python.client import device_lib
+#devices = device_lib.list_local_devices()
+#kept_devices = [d.name[-len("GPU:X"):] for d in devices if "NVIDIA RTX 4500 Ada Generation, pci bus id: 0000:db:00.0" in d.physical_device_desc or d.device_type == "CPU"]
+#tf.config.set_visible_devices([d for d in tf.config.list_physical_devices() if any(kept in d.name for kept in kept_devices)])
+
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Flatten, Dense, Input, Conv1D, AveragePooling1D, BatchNormalization, Activation, add
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
-from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical, Sequence
 
 from utils import *
 
-RWS_SUBTRACE, RWS_SUBKEYWIDTH = np.arange(500, 5500), KEYROUND_WIDTH_B4 // 4
+PARAMS_LIST = {
+    "rws_only": {
+        "rws": True,
+        "rounds": False,
+        "subtrace": np.arange(500, 5500),
+        "rws_subkey_width": KEYROUND_WIDTH_B4 // 4,
+        "perm_nodes": 1024,
+        "mask_nodes": 512,
+        "num_res_stacks": 8,
+        "batch_size": 32
+    },
+    "1st_round": {
+        "rws": False,
+        "rounds": True,
+        "subtrace": np.concatenate((
+            np.arange(19350, 21250),
+            np.arange(61900, 61950),
+            np.arange(75350, 77800)
+        )),
+    #          traces_total[:, 23950:24400],
+    #          traces_total[:, 26700:27150],
+    #          traces_total[:, 29450:29900],
+    #          traces_total[:, 31450:35500],
+    #          traces_total[:, 37650:37750],
+    #          traces_total[:, 39750:39850],
+    #          traces_total[:, 42100:42200],
+    #          traces_total[:, 44950:45050],
+    #          traces_total[:, 53350:53450],
+    #          traces_total[:, 53750:53850],
+    #          traces_total[:, 56150:56250],
+    #          traces_total[:, 75350:75700],
+    #          traces_total[:, 77500:77800
+        "perm_nodes": 1024,
+        "mask_nodes": 512,
+        "num_res_stacks": 9,
+        "batch_size": 32
+    },
+    "rws_and_14_rounds": {
+        "rws": True,
+        "rounds": True,
+        #"subtrace": np.arange(0, 25000), # Haar 3
+        "subtrace": np.concatenate(( # Haar 2
+            np.arange(300, 5500),    # RWS perm + RWS masks
+            np.arange(5500, 5900),   # Round 0
+            np.arange(8450, 8950),   # Round 1
+            np.arange(11550, 12050), # Round 2
+            np.arange(14600, 15100), # Round 3
+            np.arange(17700, 18200), # Round 4
+            np.arange(20750, 21250), # Round 5
+            np.arange(23850, 24350), # Round 6
+            np.arange(26900, 27400), # Round 7
+            np.arange(30000, 30500), # Round 8
+            np.arange(33050, 33550), # Round 9
+            np.arange(36150, 36650), # Round 10
+            np.arange(39225, 39725), # Round 11
+            np.arange(42300, 42800), # Round 12
+            np.arange(45400, 45900), # Round 13
+            np.arange(48465, 48515), # Round perm
+        )),
+        "rws_subkey_width": KEYROUND_WIDTH_B4,
+        "perm_nodes": 512,
+        "mask_nodes": 128,
+        "num_res_stacks": 9,
+        "batch_size": 128
+    }
+}
+PARAMS = PARAMS_LIST["rws_and_14_rounds"]
 
 def check_file_exists(file_path):
 	file_path = os.path.normpath(file_path)
@@ -20,6 +94,24 @@ def check_file_exists(file_path):
 		raise ValueError("Error: provided file path '%s' does not exist!" % file_path)
 	return
 
+class DataGenerator(Sequence):
+    def __init__(self, x_set, y_set):
+        self.x = x_set.reshape((x_set.shape[0], x_set.shape[1], 1))
+
+        self.y = {}
+        if PARAMS["rws"]:
+            self.y.update(ResNetSCA.rws_multilabel_to_categorical(y_set))
+        if PARAMS["rounds"]:
+            self.y.update(ResNetSCA.multilabel_to_categorical(y_set))
+        
+        self.batch_size = PARAMS["batch_size"]
+
+    def __len__(self):
+        return int(np.ceil(len(self.x) / float(self.batch_size)))
+
+    def __getitem__(self, idx):
+        return self.x[idx * self.batch_size:(idx + 1) * self.batch_size], {k: v[idx * self.batch_size:(idx + 1) * self.batch_size] for k, v in self.y.items()}
+    
 class ResNetSCA:
     # https://github.com/ANSSI-FR/ASCAD/blob/master/ASCAD_train_models.py
     @staticmethod
@@ -42,37 +134,37 @@ class ResNetSCA:
 
     @staticmethod
     def rws_branch(x):
-        x = Dense(1024, activation='relu', name='rws_perm')(x)
+        x = Dense(PARAMS["perm_nodes"], activation='relu', name='rws_perm')(x)
         x = BatchNormalization()(x)
         x = Dense(KEYROUND_WIDTH_B4, activation="softmax", name='rws_perm_output')(x)
         return x
 
     @staticmethod
     def rws_mask_branch(x, keyround_idx, share_idx):
-        x = Dense(512, activation='relu', name=f'rws_mask_{keyround_idx}_{share_idx}')(x)
+        x = Dense(PARAMS["mask_nodes"], activation='relu', name=f'rws_mask_{keyround_idx}_{share_idx}')(x)
         x = BatchNormalization()(x)
         x = Dense(len(KEY_ALPHABET), activation="softmax", name=f'rws_mask_{keyround_idx}_{share_idx}_output')(x)
         return x
 
     @staticmethod
     def round_branch(x):
-        x = Dense(256, activation='relu', name='round_perm')(x)
+        x = Dense(PARAMS["perm_nodes"], activation='relu', name='round_perm')(x)
         x = BatchNormalization()(x)
         x = Dense(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4, activation="softmax", name='round_perm_output')(x)
         return x
 
     @staticmethod
     def block_branch(x, round_idx):
-        x = Dense(256, activation='relu', name=f'block_perm_{round_idx}')(x)
+        x = Dense(PARAMS["perm_nodes"], activation='relu', name=f'block_perm_{round_idx}')(x)
         x = BatchNormalization()(x)
         x = Dense(BLOCK_WIDTH_B4, activation="softmax", name=f'block_perm_{round_idx}_output')(x)
         return x
     
     @staticmethod
-    def mask_branch(x, round_idx, block_idx):
-        x = Dense(512, activation='relu', name=f'mask_{round_idx}_{block_idx}')(x)
+    def mask_branch(x, round_idx, block_idx, share_idx):
+        x = Dense(PARAMS["mask_nodes"], activation='relu', name=f'mask_{round_idx}_{block_idx}_{share_idx}')(x)
         x = BatchNormalization()(x)
-        x = Dense(len(KEY_ALPHABET) ** NR_SHARES, activation="softmax", name=f'mask_{round_idx}_{block_idx}_output')(x)
+        x = Dense(len(KEY_ALPHABET), activation="softmax", name=f'mask_{round_idx}_{block_idx}_{share_idx}_output')(x)
         return x
 
     @staticmethod
@@ -80,7 +172,7 @@ class ResNetSCA:
         y = {}        
         y['rws_perm_output'] = to_categorical(Y['rws_perm'], num_classes=KEYROUND_WIDTH_B4).astype(np.int8)
 
-        for keyround_idx in range(RWS_SUBKEYWIDTH):
+        for keyround_idx in range(PARAMS["rws_subkey_width"]):
             for share_idx in range(NR_SHARES):
                 y[f'rws_mask_{keyround_idx}_{share_idx}_output'] = to_categorical(Y[f'rws_mask_{keyround_idx}_{share_idx}'], num_classes=len(KEY_ALPHABET)).astype(np.int8)
         return y
@@ -93,20 +185,20 @@ class ResNetSCA:
         for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
             y[f'block_perm_{round_idx}_output'] = to_categorical(Y[f'block_perm_{round_idx}'], num_classes=BLOCK_WIDTH_B4).astype(np.int8)
             for block_idx in range(BLOCK_WIDTH_B4):
-                y[f'mask_{round_idx}_{block_idx}_output'] = to_categorical(Y[f'mask_{round_idx}_{block_idx}'], num_classes=len(KEY_ALPHABET) ** NR_SHARES).astype(np.int8)
+                for share_idx in range(NR_SHARES):
+                    y[f'mask_{round_idx}_{block_idx}_{share_idx}_output'] = to_categorical(Y[f'mask_{round_idx}_{block_idx}_{share_idx}'], num_classes=len(KEY_ALPHABET)).astype(np.int8)
         return y
 
-    def __init__(self, rws, epochs, dataset_size, batch_size, depth=19):
-        #depth = 37 if rws else 19
+    def __init__(self, epochs, dataset_size, depth=19):
         if (depth - 1) % 18 != 0:
             raise ValueError('depth should be 18n+1 (eg 19, 37, 55 ...)')
         # Start model definition.
         num_filters = 16
         num_res_blocks = int((depth - 1) / 18)
-        inputs = Input(shape=(len(RWS_SUBTRACE) if rws else 1950, 1))
+        inputs = Input(shape=(len(PARAMS["subtrace"]), 1))
         x = ResNetSCA.resnet_layer(inputs=inputs)
         # Instantiate the stack of residual units
-        for stack in range(8 if rws else 6):
+        for stack in range(PARAMS["num_res_stacks"]):
             for res_block in range(num_res_blocks):
                 strides = 1
                 if stack > 0 and res_block == 0:
@@ -130,30 +222,31 @@ class ResNetSCA:
                 num_filters *= 2
         x = AveragePooling1D(pool_size=4)(x)
         x = Flatten()(x)
-        if rws:
+
+        total = []
+        if PARAMS["rws"]:
             x_rws = ResNetSCA.rws_branch(x)
             x_rws_masks = []
-            for keyround_idx in range(RWS_SUBKEYWIDTH):
+            for keyround_idx in range(PARAMS["rws_subkey_width"]):
                 for share_idx in range(NR_SHARES):
                     x_rws_masks.append(ResNetSCA.rws_mask_branch(x, keyround_idx, share_idx))
-            total = [x_rws] + x_rws_masks
-        else:
+            total += [x_rws] + x_rws_masks
+        if PARAMS["rounds"]:
             x_round = ResNetSCA.round_branch(x)
             x_block = []
             x_masks = []
             for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
                 x_block.append(ResNetSCA.block_branch(x, round_idx))
                 for block_idx in range(BLOCK_WIDTH_B4):
-                    x_masks.append(ResNetSCA.mask_branch(x, round_idx, block_idx))
-            total = [x_round] + x_block + x_masks
+                    for share_idx in range(NR_SHARES):
+                        x_masks.append(ResNetSCA.mask_branch(x, round_idx, block_idx, share_idx))
+            total += [x_round] + x_block + x_masks
 
         self.model = Model(inputs, total, name='extract_resnet')
-        optimizer = Adam(learning_rate=ExponentialDecay(initial_learning_rate=0.001, decay_steps=epochs*dataset_size/batch_size, decay_rate=0.9))
-        self.model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy']*len(total))
-        self.rws = rws
+        #optimizer = Adam(learning_rate=ExponentialDecay(initial_learning_rate=0.001, decay_steps=epochs*dataset_size/PARAMS["batch_size"], decay_rate=0.9))
+        self.model.compile(loss='categorical_crossentropy', optimizer=Adam(), metrics={o.name[:-len('/Softmax:0')]: 'accuracy' for o in total})
         self.epochs = epochs
         self.dataset_size = dataset_size
-        self.batch_size = batch_size
 
     def train_model(self, X_profiling, Y_profiling, save_file_name, validation_split=0.2, early_stopping=1, patience=10):
         assert X_profiling.shape[0] == self.dataset_size
@@ -185,48 +278,74 @@ class ResNetSCA:
         else:
             print("Error: model input shape length %d is not expected ..." % len(input_layer_shape))
             sys.exit(-1)
-        y = ResNetSCA.rws_multilabel_to_categorical(Y_profiling) if self.rws else ResNetSCA.multilabel_to_categorical(Y_profiling)
-        history = self.model.fit(x=Reshaped_X_profiling, y=y, batch_size=self.batch_size, verbose = 1, validation_split=validation_split, epochs=self.epochs, callbacks=callbacks)
+
+        y = {}
+        if PARAMS["rws"]:
+            y.update(ResNetSCA.rws_multilabel_to_categorical(Y_profiling))
+        if PARAMS["rounds"]:
+            y.update(ResNetSCA.multilabel_to_categorical(Y_profiling))
+
+        history = self.model.fit(x=Reshaped_X_profiling, y=y, batch_size=PARAMS["batch_size"], verbose = 1, validation_split=validation_split, epochs=self.epochs, callbacks=callbacks)
         return history
 
-def prepare_data_dl(rws, traces_total, round_perms_labels, copy_perms_labels, masks_labels, rws_perms_labels, rws_masks_labels):
-    if rws:
-        X_total = np.concatenate((
-            traces_total[:, RWS_SUBTRACE],
-            ), axis=1) # Size: 5000 features
-        y_total = {"rws_perm": rws_perms_labels}
-        for keyround_idx in range(RWS_SUBKEYWIDTH):
+    def train_model_generator(self, X_y_gen_training, X_y_gen_val, save_file_name, patience=10):
+        check_file_exists(os.path.dirname(save_file_name))
+        # Save model calllback
+        save_model = ModelCheckpoint(save_file_name, save_best_only=True)
+        callbacks=[save_model]
+        # Early stopping callback
+        callbacks.append(EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True))
+        
+        history = self.model.fit(x=X_y_gen_training, verbose = 1, validation_data=X_y_gen_val, epochs=self.epochs, callbacks=callbacks)
+        return history
+
+
+def prepare_data_dl(traces_total, round_perms_labels, copy_perms_labels, masks_labels, rws_perms_labels, rws_masks_labels):
+    X_total = traces_total[:, PARAMS["subtrace"]]
+
+    y_total = {}
+    if PARAMS["rws"]:
+        y_total["rws_perm"] = rws_perms_labels
+        for keyround_idx in range(PARAMS["rws_subkey_width"]):
             for share_idx in range(NR_SHARES):
                 y_total[f'rws_mask_{keyround_idx}_{share_idx}'] = rws_masks_labels[keyround_idx, share_idx]
-    else:
-        X_total = np.concatenate((
-            traces_total[:, 19350:21250],
-    #          traces_total[:, 23950:24400],
-    #          traces_total[:, 26700:27150],
-    #          traces_total[:, 29450:29900],
-    #          traces_total[:, 31450:35500],
-    #          traces_total[:, 37650:37750],
-    #          traces_total[:, 39750:39850],
-    #          traces_total[:, 42100:42200],
-    #          traces_total[:, 44950:45050],
-    #          traces_total[:, 53350:53450],
-    #          traces_total[:, 53750:53850],
-    #          traces_total[:, 56150:56250],
-            traces_total[:, 61900:61950]), axis=1) # Size: 1950 features
-    #          traces_total[:, 75350:75700],
-    #          traces_total[:, 77500:77800]), axis=1) # Size: 8700 features
-    #        traces_total[:, 75350:77800]), axis=1) # Size: 4400 features
-
-        y_total = {"round_perm": round_perms_labels}
+    if PARAMS["rounds"]:
+        y_total["round_perm"] = round_perms_labels
         for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
             y_total[f'block_perm_{round_idx}'] = copy_perms_labels[round_idx]
             for block_idx in range(BLOCK_WIDTH_B4):
-                y_total[f'mask_{round_idx}_{block_idx}'] = 16 * masks_labels[round_idx, block_idx, 0] + masks_labels[round_idx, block_idx, 1]
+                for share_idx in range(NR_SHARES):
+                    y_total[f'mask_{round_idx}_{block_idx}_{share_idx}'] = masks_labels[round_idx, block_idx, share_idx]
 
     return X_total, y_total
 
-def extract_key(X_extraction, save_file_name):
-    model = load_model(save_file_name)
-    Y_extraction = model.predict(X_extraction)
+def load_tfrecord(filename: str, test_size: int, random_state=None):
+    raise NotImplementedError
+    def decode_fn(record):
+        DECODE_SCHEMA = {}
+        DECODE_SCHEMA["x"] = tf.io.FixedLenFeature([len(RWS_SUBTRACE)], dtype=tf.float32)
+        DECODE_SCHEMA["rws_perm"] = tf.io.FixedLenFeature([], dtype=tf.int32)
+        for keyround_idx in range(RWS_SUBKEYWIDTH):
+            for share_idx in range(NR_SHARES):
+                DECODE_SCHEMA[f'rws_mask_{keyround_idx}_{share_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
+        DECODE_SCHEMA["round_perm"] = tf.io.FixedLenFeature([], dtype=tf.int32)
+        for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+            DECODE_SCHEMA[f'block_perm_{round_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
+            for block_idx in range(BLOCK_WIDTH_B4):
+                for share_idx in range(NR_SHARES):
+                    DECODE_SCHEMA[f'mask_{round_idx}_{block_idx}_{share_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
 
-    return Y_extraction
+        decoded = tf.io.parse_single_example(record, DECODE_SCHEMA)
+
+        return decoded["x"], {k: v for k, v in decoded.items() if k != "x"}
+
+    dataset = tf.data.TFRecordDataset(filename).map(decode_fn)
+
+    dataset = dataset.shuffle(seed=random_state)
+    train_dataset = full_dataset.take(train_size)
+    test_dataset = full_dataset.skip(train_size)
+    val_dataset = test_dataset.skip(test_size)
+    test_dataset = test_dataset.take(test_size)
+
+
+    return X_profiling, X_extraction, y_profiling, y_extraction

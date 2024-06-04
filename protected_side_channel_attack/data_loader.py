@@ -26,9 +26,10 @@ class EntireTraceIterator:
     def __len__(self):
         return self.len
 
-    def __call__(self, target_pop, target_scenario):
+    def __call__(self, target_pop, target_scenario, return_traces=True):
         self.target_pop = target_pop
         self.target_scenario = target_scenario
+        self.return_traces = return_traces
         return self
 
     def __iter__(self):
@@ -46,10 +47,12 @@ class EntireTraceIterator:
         assert nr_selected_traces % (self.nr_populations * self.nr_scenarios) == 0
         stop_log     = self.start_log + nr_selected_traces + nr_selected_traces // self.nr_scenarios
 
-        traces_dict = sio.loadmat(self.traces_path, variable_names=[f"data_{t + p * (self.nr_scenarios) + s}" for t in range(start_traces + 1, stop_traces + 1, self.nr_populations * self.nr_scenarios) for p in self.target_pop for s in self.target_scenario])
+        if self.return_traces:
+            traces_dict = sio.loadmat(self.traces_path, variable_names=[f"data_{t + p * (self.nr_scenarios) + s}" for t in range(start_traces + 1, stop_traces + 1, self.nr_populations * self.nr_scenarios) for p in self.target_pop for s in self.target_scenario])
         inputs_outputs = self.inputs_outputs[self.start_log:stop_log]
 
-        traces     = [[[] for ss in range(len(self.target_scenario))] for pp in range(len(self.target_pop))]
+        if self.return_traces:
+            traces     = [[[] for ss in range(len(self.target_scenario))] for pp in range(len(self.target_pop))]
         seeds      = [[[] for ss in range(len(self.target_scenario))] for pp in range(len(self.target_pop))]
         key        = [[int(c, 16) for c in inputs_outputs[1][0][0]]]
         parsed_output = [[[] for ss in range(len(self.target_scenario))] for pp in range(len(self.target_pop))]
@@ -59,7 +62,8 @@ class EntireTraceIterator:
                 for t, io in zip(range(start_traces + 1, stop_traces + 1, self.nr_populations * self.nr_scenarios), range(0, len(inputs_outputs), self.nr_populations * (self.nr_scenarios + 1))):
                     if t + p * (self.nr_scenarios) + s not in self.empty_traces:
                         seeds[pp][ss].append(inputs_outputs[io + p * (self.nr_scenarios + 1)][0][0])
-                        traces[pp][ss].append(traces_dict[f"data_{t + p * (self.nr_scenarios) + s}"][0, 0][4][:, 0])
+                        if self.return_traces:
+                            traces[pp][ss].append(traces_dict[f"data_{t + p * (self.nr_scenarios) + s}"][0, 0][4][:, 0])
 
                         parsed = []
                         if "keyshares" in self.parse_output:
@@ -73,12 +77,12 @@ class EntireTraceIterator:
                         parsed_output[pp][ss].append(parsed)
 
                 seeds[pp][ss] = np.array(seeds[pp][ss])
-                traces[pp][ss] = np.stack(traces[pp][ss])
-                assert traces[pp][ss].shape[1] == self.trace_size
+                if self.return_traces:
+                    traces[pp][ss] = np.stack(traces[pp][ss])
+                    assert traces[pp][ss].shape[0] == seeds[pp][ss].shape[0]
+                    assert traces[pp][ss].shape[1] == self.trace_size
                 parsed_output[pp][ss] = [np.stack([parsed_output[pp][ss][oo][o] for oo in range(len(parsed_output[pp][ss]))]) for o in range(len(parsed_output[pp][ss][0]))]
         
-                assert seeds[pp][ss].shape[0] == traces[pp][ss].shape[0]
-
                 if self.parse_output == "keyshares":
                     assert parsed_output[pp][ss][0].shape == (seeds[pp][ss].shape[0], utils.KEY_WIDTH_B4, utils.NR_SHARES)
                 elif self.parse_output == "perms":
@@ -90,7 +94,10 @@ class EntireTraceIterator:
         self.curr += 1
         self.start_log += (stop_log - self.start_log)
 
-        return seeds, traces, key, parsed_output
+        if self.return_traces:
+            return seeds, traces, key, parsed_output
+        else:
+            return seeds, key, parsed_output
 
     def full(self, dataset_size: int):
         if self.target_pop is None or self.target_scenario is None or len(self.target_pop) != 1 or len(self.target_scenario) != 1:
