@@ -21,18 +21,23 @@ from tensorflow.keras.utils import to_categorical, Sequence
 from utils import *
 
 PARAMS_LIST = {
-    "rws_only": {
+    "old_orig_rws_first_24": {
+        "rws_perm": True,
         "rws": True,
+        "round_perm": False,
         "rounds": False,
         "subtrace": np.arange(500, 5500),
-        "rws_subkey_width": KEYROUND_WIDTH_B4 // 4,
+        "rws_subkey_width": np.arange(KEYROUND_WIDTH_B4 // 4),
         "perm_nodes": 1024,
         "mask_nodes": 512,
+        "resnet_depth": 19,
         "num_res_stacks": 8,
         "batch_size": 32
     },
-    "1st_round": {
+    "old_orig_1st_round": {
+        "rws_perm": False,
         "rws": False,
+        "round_perm": True,
         "rounds": True,
         "subtrace": np.concatenate((
             np.arange(19350, 21250),
@@ -52,15 +57,20 @@ PARAMS_LIST = {
     #          traces_total[:, 56150:56250],
     #          traces_total[:, 75350:75700],
     #          traces_total[:, 77500:77800
+        "targeted_rounds": [0],
+        "targeted_blocks": np.arange(BLOCK_WIDTH_B4),
+        "targeted_shares": np.arange(NR_SHARES),
         "perm_nodes": 1024,
         "mask_nodes": 512,
+        "resnet_depth": 19,
         "num_res_stacks": 9,
         "batch_size": 32
     },
-    "rws_and_14_rounds": {
+    "haar_2_rws_and_14_rounds": {
+        "rws_perm": True,
         "rws": True,
+        "round_perm": True,
         "rounds": True,
-        #"subtrace": np.arange(0, 25000), # Haar 3
         "subtrace": np.concatenate(( # Haar 2
             np.arange(300, 5500),    # RWS perm + RWS masks
             np.arange(5500, 5900),   # Round 0
@@ -79,14 +89,230 @@ PARAMS_LIST = {
             np.arange(45400, 45900), # Round 13
             np.arange(48465, 48515), # Round perm
         )),
-        "rws_subkey_width": KEYROUND_WIDTH_B4,
+        "rws_subkey_width": np.arange(KEYROUND_WIDTH_B4),
+        "targeted_rounds": np.arange(KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4),
+        "targeted_blocks": np.arange(BLOCK_WIDTH_B4),
+        "targeted_shares": np.arange(NR_SHARES),
         "perm_nodes": 512,
         "mask_nodes": 128,
+        "resnet_depth": 19,
         "num_res_stacks": 9,
         "batch_size": 128
-    }
+    },
+    "haar_2_rws_only": {
+        "rws_perm": True,
+        "rws": True,
+        "round_perm": False,
+        "rounds": False,
+        "subtrace": np.concatenate((
+            np.arange(300, 5500),    # RWS perm + RWS masks
+        )),
+        "rws_subkey_width": np.arange(KEYROUND_WIDTH_B4),
+        "perm_nodes": 512,
+        "mask_nodes": 256,
+        "resnet_depth": 19,
+        "num_res_stacks": 8,
+        "batch_size": 64
+    },
 }
-PARAMS = PARAMS_LIST["rws_and_14_rounds"]
+for i, pois in enumerate([
+    np.arange(5500, 5900),   # Round 0
+    np.arange(8450, 8950),   # Round 1
+    np.arange(11550, 12050), # Round 2
+    np.arange(14600, 15100), # Round 3
+    np.arange(17700, 18200), # Round 4
+    np.arange(20750, 21250), # Round 5
+    np.arange(23850, 24350), # Round 6
+    np.arange(26900, 27400), # Round 7
+    np.arange(30000, 30500), # Round 8
+    np.arange(33050, 33550), # Round 9
+    np.arange(36150, 36650), # Round 10
+    np.arange(39225, 39725), # Round 11
+    np.arange(42300, 42800), # Round 12
+    np.arange(45400, 45900), # Round 13
+]):
+    PARAMS_LIST[f"haar_2_round_{i}"] = {
+        "rws_perm": False,
+        "rws": False,
+        "round_perm": False,
+        "rounds": True,
+        "subtrace": np.concatenate((
+            pois,
+        )),
+        "targeted_rounds": [i],
+        "targeted_blocks": np.arange(BLOCK_WIDTH_B4),
+        "targeted_shares": np.arange(NR_SHARES),
+        "perm_nodes": 1024,
+        "mask_nodes": 1024,
+        "resnet_depth": 19,
+        "num_res_stacks": 4,
+        "batch_size": 64
+    }
+
+PARAMS_LIST["orig_rws_perm_only"] = {
+    "rws_perm": True,
+    "rws": False,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(1250, 21100),    # RWS perm
+    )),
+    "perm_nodes": 1024,
+    "resnet_depth": 19,
+    "num_res_stacks": 10,
+    "batch_size": 32
+}
+PARAMS_LIST["orig_rws_0"] = {
+    "rws_perm": False,
+    "rws": True,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(1300, 6175),    # RWS masks
+    )),
+    "rws_subkey_width": np.arange(0, KEYROUND_WIDTH_B4 // 4),
+    "mask_nodes": 512,
+    "resnet_depth": 19,
+    "num_res_stacks": 8,
+    "batch_size": 64
+}
+PARAMS_LIST["orig_rws_1"] = {
+    "rws_perm": False,
+    "rws": True,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(6175, 11030),    # RWS masks
+    )),
+    "rws_subkey_width": np.arange(KEYROUND_WIDTH_B4 // 4, 2 * (KEYROUND_WIDTH_B4 // 4)),
+    "mask_nodes": 512,
+    "resnet_depth": 19,
+    "num_res_stacks": 8,
+    "batch_size": 64
+}
+PARAMS_LIST["orig_rws_2"] = {
+    "rws_perm": False,
+    "rws": True,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(11030, 15890),    # RWS masks
+    )),
+    "rws_subkey_width": np.arange(2 * (KEYROUND_WIDTH_B4 // 4), 3 * (KEYROUND_WIDTH_B4 // 4)),
+    "mask_nodes": 512,
+    "resnet_depth": 19,
+    "num_res_stacks": 8,
+    "batch_size": 64
+}
+PARAMS_LIST["orig_rws_3"] = {
+    "rws_perm": False,
+    "rws": True,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(15890, 21160),    # RWS masks
+    )),
+    "rws_subkey_width": np.arange(3 * (KEYROUND_WIDTH_B4 // 4), KEYROUND_WIDTH_B4),
+    "mask_nodes": 512,
+    "resnet_depth": 19,
+    "num_res_stacks": 8,
+    "batch_size": 64
+}
+PARAMS_LIST["orig_rws_only"] = {
+    "rws_perm": True,
+    "rws": True,
+    "round_perm": False,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange(1100, 21500),    # RWS perm + RWS masks
+    )),
+    "rws_subkey_width": np.arange(KEYROUND_WIDTH_B4),
+    "perm_nodes": 512,
+    "mask_nodes": 256,
+    "resnet_depth": 19,
+    "num_res_stacks": 10,
+    "batch_size": 128
+}
+PARAMS_LIST["orig_round_perm_only"] = {
+    "rws_perm": False,
+    "rws": False,
+    "round_perm": True,
+    "rounds": False,
+    "subtrace": np.concatenate((
+        np.arange( 21750,  21800),
+        np.arange( 33925,  33975),
+        np.arange( 46250,  46300),
+        np.arange( 58550,  25600),
+        np.arange( 70860,  70910),
+        np.arange( 83180,  83230),
+        np.arange( 95480,  95530),
+        np.arange(107800, 107850),
+        np.arange(120110, 120160),
+        np.arange(132415, 132465),
+        np.arange(144725, 144775),
+        np.arange(157040, 157090),
+        np.arange(169350, 169400),
+        np.arange(181660, 181710),
+        np.arange(193960, 194010),
+    )),
+    "perm_nodes": 1024,
+    "resnet_depth": 19,
+    "num_res_stacks": 5,
+    "batch_size": 32
+}
+for i, pois in enumerate([
+    np.arange( 21950,  23350), # Round 0
+    np.arange( 34250,  35650), # Round 1
+    np.arange( 46550,  47950), # Round 2
+    np.arange( 58850,  60250), # Round 3
+    np.arange( 71150,  72550), # Round 4
+    np.arange( 83500,  84900), # Round 5
+    np.arange( 95800,  97200), # Round 6
+    np.arange(108100, 109500), # Round 7
+    np.arange(120400, 121800), # Round 8
+    np.arange(132700, 134100), # Round 9
+    np.arange(145025, 146425), # Round 10
+    np.arange(157350, 158750), # Round 11
+    np.arange(169650, 171050), # Round 12
+    np.arange(181950, 183350), # Round 13
+]):
+    PARAMS_LIST[f"orig_round_{i}"] = {
+        "rws_perm": False,
+        "rws": False,
+        "round_perm": False,
+        "rounds": True,
+        "subtrace": np.concatenate((
+            pois,
+        )),
+        "targeted_rounds": [i],
+        "targeted_blocks": np.arange(BLOCK_WIDTH_B4),
+        "targeted_shares": np.arange(NR_SHARES),
+        "perm_nodes": 1024,
+        "mask_nodes": 512,
+        "resnet_depth": 19,
+        "num_res_stacks": 6,
+        "batch_size": 64
+    }
+PARAMS_LIST["test_mask_0_0_0"] = {
+    "rws_perm": False,
+    "rws": False,
+    "round_perm": False,
+    "rounds": True,
+    "subtrace": np.concatenate((
+        np.arange(22100, 22170),
+    )),
+    "targeted_rounds": [0],
+    "targeted_blocks": [0],
+    "targeted_shares": [0],
+    "mask_nodes": 512,
+    "resnet_depth": 19,
+    "num_res_stacks": 0,
+    "batch_size": 64
+}
+
+
+
+PARAMS = {}
 
 def check_file_exists(file_path):
 	file_path = os.path.normpath(file_path)
@@ -99,11 +325,15 @@ class DataGenerator(Sequence):
         self.x = x_set.reshape((x_set.shape[0], x_set.shape[1], 1))
 
         self.y = {}
+        if PARAMS["rws_perm"]:
+            self.y.update(ResNetSCA.rws_perm_multilabel_to_categorical(y_set))
         if PARAMS["rws"]:
             self.y.update(ResNetSCA.rws_multilabel_to_categorical(y_set))
+        if PARAMS["round_perm"]:
+            self.y.update(ResNetSCA.round_perm_multilabel_to_categorical(y_set))
         if PARAMS["rounds"]:
-            self.y.update(ResNetSCA.multilabel_to_categorical(y_set))
-        
+            self.y.update(ResNetSCA.rounds_multilabel_to_categorical(y_set))
+
         self.batch_size = PARAMS["batch_size"]
 
     def __len__(self):
@@ -168,33 +398,47 @@ class ResNetSCA:
         return x
 
     @staticmethod
-    def rws_multilabel_to_categorical(Y):
-        y = {}        
+    def rws_perm_multilabel_to_categorical(Y):
+        y = {}
         y['rws_perm_output'] = to_categorical(Y['rws_perm'], num_classes=KEYROUND_WIDTH_B4).astype(np.int8)
 
-        for keyround_idx in range(PARAMS["rws_subkey_width"]):
+        return y
+    
+    @staticmethod
+    def rws_multilabel_to_categorical(Y):
+        y = {}
+
+        for keyround_idx in PARAMS["rws_subkey_width"]:
             for share_idx in range(NR_SHARES):
                 y[f'rws_mask_{keyround_idx}_{share_idx}_output'] = to_categorical(Y[f'rws_mask_{keyround_idx}_{share_idx}'], num_classes=len(KEY_ALPHABET)).astype(np.int8)
         return y
 
     @staticmethod
-    def multilabel_to_categorical(Y):
+    def round_perm_multilabel_to_categorical(Y):
         y = {}
         y['round_perm_output'] = to_categorical(Y['round_perm'], num_classes=KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4).astype(np.int8)
 
-        for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+        return y
+    
+    @staticmethod
+    def rounds_multilabel_to_categorical(Y):
+        y = {}
+
+        for round_idx in PARAMS["targeted_rounds"]:
             y[f'block_perm_{round_idx}_output'] = to_categorical(Y[f'block_perm_{round_idx}'], num_classes=BLOCK_WIDTH_B4).astype(np.int8)
-            for block_idx in range(BLOCK_WIDTH_B4):
-                for share_idx in range(NR_SHARES):
+            for block_idx in PARAMS["targeted_blocks"]:
+                for share_idx in PARAMS["targeted_shares"]:
                     y[f'mask_{round_idx}_{block_idx}_{share_idx}_output'] = to_categorical(Y[f'mask_{round_idx}_{block_idx}_{share_idx}'], num_classes=len(KEY_ALPHABET)).astype(np.int8)
         return y
 
-    def __init__(self, epochs, dataset_size, depth=19):
-        if (depth - 1) % 18 != 0:
+    def __init__(self, network, epochs, dataset_size):
+        global PARAMS
+        PARAMS = PARAMS_LIST[network]
+        if (PARAMS["resnet_depth"] - 1) % 18 != 0:
             raise ValueError('depth should be 18n+1 (eg 19, 37, 55 ...)')
         # Start model definition.
         num_filters = 16
-        num_res_blocks = int((depth - 1) / 18)
+        num_res_blocks = int((PARAMS["resnet_depth"] - 1) / 18)
         inputs = Input(shape=(len(PARAMS["subtrace"]), 1))
         x = ResNetSCA.resnet_layer(inputs=inputs)
         # Instantiate the stack of residual units
@@ -224,23 +468,27 @@ class ResNetSCA:
         x = Flatten()(x)
 
         total = []
-        if PARAMS["rws"]:
+        if PARAMS["rws_perm"]:
             x_rws = ResNetSCA.rws_branch(x)
+            total += [x_rws]
+        if PARAMS["rws"]:
             x_rws_masks = []
-            for keyround_idx in range(PARAMS["rws_subkey_width"]):
+            for keyround_idx in PARAMS["rws_subkey_width"]:
                 for share_idx in range(NR_SHARES):
                     x_rws_masks.append(ResNetSCA.rws_mask_branch(x, keyround_idx, share_idx))
-            total += [x_rws] + x_rws_masks
-        if PARAMS["rounds"]:
+            total += x_rws_masks
+        if PARAMS["round_perm"]:
             x_round = ResNetSCA.round_branch(x)
+            total += [x_round]
+        if PARAMS["rounds"]:
             x_block = []
             x_masks = []
-            for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+            for round_idx in PARAMS["targeted_rounds"]:
                 x_block.append(ResNetSCA.block_branch(x, round_idx))
-                for block_idx in range(BLOCK_WIDTH_B4):
-                    for share_idx in range(NR_SHARES):
+                for block_idx in PARAMS["targeted_blocks"]:
+                    for share_idx in PARAMS["targeted_shares"]:
                         x_masks.append(ResNetSCA.mask_branch(x, round_idx, block_idx, share_idx))
-            total += [x_round] + x_block + x_masks
+            total += x_block + x_masks
 
         self.model = Model(inputs, total, name='extract_resnet')
         #optimizer = Adam(learning_rate=ExponentialDecay(initial_learning_rate=0.001, decay_steps=epochs*dataset_size/PARAMS["batch_size"], decay_rate=0.9))
@@ -280,10 +528,14 @@ class ResNetSCA:
             sys.exit(-1)
 
         y = {}
+        if PARAMS["rws_perm"]:
+            self.y.update(ResNetSCA.rws_perm_multilabel_to_categorical(Y_profiling))
         if PARAMS["rws"]:
             y.update(ResNetSCA.rws_multilabel_to_categorical(Y_profiling))
+        if PARAMS["round_perm"]:
+            y.update(ResNetSCA.round_perm_multilabel_to_categorical(Y_profiling))
         if PARAMS["rounds"]:
-            y.update(ResNetSCA.multilabel_to_categorical(Y_profiling))
+            y.update(ResNetSCA.rounds_multilabel_to_categorical(Y_profiling))
 
         history = self.model.fit(x=Reshaped_X_profiling, y=y, batch_size=PARAMS["batch_size"], verbose = 1, validation_split=validation_split, epochs=self.epochs, callbacks=callbacks)
         return history
@@ -301,51 +553,18 @@ class ResNetSCA:
 
 
 def prepare_data_dl(traces_total, round_perms_labels, copy_perms_labels, masks_labels, rws_perms_labels, rws_masks_labels):
-    X_total = traces_total[:, PARAMS["subtrace"]]
+    X_total = traces_total
 
     y_total = {}
-    if PARAMS["rws"]:
-        y_total["rws_perm"] = rws_perms_labels
-        for keyround_idx in range(PARAMS["rws_subkey_width"]):
+    y_total["rws_perm"] = rws_perms_labels
+    for keyround_idx in range(KEYROUND_WIDTH_B4):
+        for share_idx in range(NR_SHARES):
+            y_total[f'rws_mask_{keyround_idx}_{share_idx}'] = rws_masks_labels[keyround_idx, share_idx]
+    y_total["round_perm"] = round_perms_labels
+    for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
+        y_total[f'block_perm_{round_idx}'] = copy_perms_labels[round_idx]
+        for block_idx in range(BLOCK_WIDTH_B4):
             for share_idx in range(NR_SHARES):
-                y_total[f'rws_mask_{keyround_idx}_{share_idx}'] = rws_masks_labels[keyround_idx, share_idx]
-    if PARAMS["rounds"]:
-        y_total["round_perm"] = round_perms_labels
-        for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
-            y_total[f'block_perm_{round_idx}'] = copy_perms_labels[round_idx]
-            for block_idx in range(BLOCK_WIDTH_B4):
-                for share_idx in range(NR_SHARES):
-                    y_total[f'mask_{round_idx}_{block_idx}_{share_idx}'] = masks_labels[round_idx, block_idx, share_idx]
+                y_total[f'mask_{round_idx}_{block_idx}_{share_idx}'] = masks_labels[round_idx, block_idx, share_idx]
 
     return X_total, y_total
-
-def load_tfrecord(filename: str, test_size: int, random_state=None):
-    raise NotImplementedError
-    def decode_fn(record):
-        DECODE_SCHEMA = {}
-        DECODE_SCHEMA["x"] = tf.io.FixedLenFeature([len(RWS_SUBTRACE)], dtype=tf.float32)
-        DECODE_SCHEMA["rws_perm"] = tf.io.FixedLenFeature([], dtype=tf.int32)
-        for keyround_idx in range(RWS_SUBKEYWIDTH):
-            for share_idx in range(NR_SHARES):
-                DECODE_SCHEMA[f'rws_mask_{keyround_idx}_{share_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
-        DECODE_SCHEMA["round_perm"] = tf.io.FixedLenFeature([], dtype=tf.int32)
-        for round_idx in range(EARLIEST_ROUND, LATEST_ROUND):
-            DECODE_SCHEMA[f'block_perm_{round_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
-            for block_idx in range(BLOCK_WIDTH_B4):
-                for share_idx in range(NR_SHARES):
-                    DECODE_SCHEMA[f'mask_{round_idx}_{block_idx}_{share_idx}'] = tf.io.FixedLenFeature([], dtype=tf.int32)
-
-        decoded = tf.io.parse_single_example(record, DECODE_SCHEMA)
-
-        return decoded["x"], {k: v for k, v in decoded.items() if k != "x"}
-
-    dataset = tf.data.TFRecordDataset(filename).map(decode_fn)
-
-    dataset = dataset.shuffle(seed=random_state)
-    train_dataset = full_dataset.take(train_size)
-    test_dataset = full_dataset.skip(train_size)
-    val_dataset = test_dataset.skip(test_size)
-    test_dataset = test_dataset.take(test_size)
-
-
-    return X_profiling, X_extraction, y_profiling, y_extraction
