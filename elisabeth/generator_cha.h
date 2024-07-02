@@ -5,8 +5,6 @@
 
 #include "generator.h"
 #include "chacha.h"
-#include "filtering_4.h"
-#include "filtering_b4.h"
 
 typedef struct {
     rng r;

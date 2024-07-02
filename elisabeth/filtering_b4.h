@@ -4,10 +4,6 @@
 #include "types.h"
 #include "masking.h"
 
-#define KEY_WIDTH_B4 512
-#define BLOCK_WIDTH_B4 7
-#define KEYROUND_WIDTH_B4 98
-
 static uint4_t S_BOXES_B4[18][16];
 
 void init_sboxes_b4();

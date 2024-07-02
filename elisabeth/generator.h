@@ -3,8 +3,7 @@
 
 #include <stddef.h>
 
-#include "filtering_4.h"
-#include "filtering_b4.h"
+#include "types.h"
 
 typedef struct _rng rng;
 
