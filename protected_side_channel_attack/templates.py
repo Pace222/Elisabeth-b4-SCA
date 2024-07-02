@@ -40,7 +40,7 @@ def b4_train_test_split(*arrays, train_size: int, val_sizes: List[int]):
 
 def b4_gridsearch_cv(signal_strengths: List[SignalStrength], n_folds: int, train_sizes: List[int], val_sizes: List[int], num_features: List[int], traces_total: np.ndarray, labels_total: np.ndarray, masking: bool=False):
     times = np.zeros((len(signal_strengths), len(train_sizes), len(val_sizes), len(num_features), n_folds), dtype=np.float64)
-    results = np.zeros((len(signal_strengths), len(train_sizes), len(val_sizes), len(num_features), n_folds), dtype=np.float64)
+    results = np.zeros((len(signal_strengths), len(train_sizes), len(val_sizes), len(num_features), n_folds, 2), dtype=np.float64)
     
     for s, sig_strength in enumerate(signal_strengths):
         for ts, train_size in enumerate(train_sizes):
@@ -52,21 +52,34 @@ def b4_gridsearch_cv(signal_strengths: List[SignalStrength], n_folds: int, train
                     traces_train, traces_val = traces_trainval[train_index], traces_trainval[val_index]
                     labels_train, labels_val = labels_trainval[train_index], labels_trainval[val_index]
                     for n, n_feat in enumerate(num_features):
-                        start = time()
-                        sig_strength.fit(traces_train, labels_train if not masking else labels_train[:, 1], n_feat) # Masking: use first share for feature selection
-                        features_train = sig_strength.transform(traces_train)
-                        if masking:
-                             assert labels_train.shape[1] == 2 and labels_val.shape[1] == 2
-                             labels_train, labels_val = 16 * labels_train[:, 0] + labels_train[:, 1], 16 * labels_val[:, 0] + labels_val[:, 1]
-                        gaussian_est = B4GaussianEstimator().fit(features_train, labels_train)
-                        times[s, ts, m, n, cv] = time() - start
+                        if not masking:
+                            start = time()
+                            sig_strength.fit(traces_train, labels_train if not masking else labels_train[:, 1], n_feat) # Masking: use first share for feature selection
+                            features_train = sig_strength.transform(traces_train)
+                            gaussian_est = B4GaussianEstimator().fit(features_train, labels_train if not masking else 16 * labels_train[:, 0] + labels_train[:, 1])
+                            times[s, ts, m, n, cv] = time() - start
 
-                        features_val = sig_strength.transform(traces_val)
-                        predicted = gaussian_est.predict(features_val)
-                        results[s, ts, m, n, cv] = np.count_nonzero(predicted == labels_val) / labels_val.shape[0]
+                            features_val = sig_strength.transform(traces_val)
+                            predicted = gaussian_est.predict(features_val)
+                            results[s, ts, m, n, cv] = np.count_nonzero(predicted == (labels_val if not masking else 16 * labels_val[:, 0] + labels_val[:, 1])) / labels_val.shape[0]
+                        else:
+                            start = time()
+                            sig_strength.fit(traces_train, labels_train[:, 1], n_feat) # Masking: use first share for feature selection
+                            features_train = sig_strength.transform(traces_train)
+                            gaussian_est_0 = B4GaussianEstimator().fit(features_train, labels_train[:, 0])
+                            gaussian_est_1 = B4GaussianEstimator().fit(features_train, labels_train[:, 1])
+                            times[s, ts, m, n, cv] = time() - start
+
+                            features_val = sig_strength.transform(traces_val)
+                            predicted_0 = gaussian_est_0.predict(features_val)
+                            results[s, ts, m, n, cv, 0] = np.count_nonzero(predicted_0 == labels_val[:, 0]) / labels_val.shape[0]
+                            predicted_1 = gaussian_est_1.predict(features_val)
+                            results[s, ts, m, n, cv, 1] = np.count_nonzero(predicted_1 == labels_val[:, 1]) / labels_val.shape[0]
+
                     del traces_train, traces_val, features_train, features_val
                 for n, n_feat in enumerate(num_features):
-                    print(f"{sig_strength} [num features: {n_feat}, train size: {train_size}, val size: {val_size}]: {np.mean(results[s, ts, m, n]):#.4g} ± {np.std(results[s, ts, m, n]):#.4g} ({results[s, ts, m, n]}). Training in {np.mean(times[s, ts, m, n]):#.4g} ± {np.std(times[s, ts, m, n]):#.4g} seconds.")
+                    print(f"{sig_strength} [num features: {n_feat}, train size: {train_size}, val size: {val_size}]: {np.mean(results[s, ts, m, n, :, 0]):#.4g} ± {np.std(results[s, ts, m, n, :, 0]):#.4g} ({results[s, ts, m, n, :, 0]}). Training in {np.mean(times[s, ts, m, n]):#.4g} ± {np.std(times[s, ts, m, n]):#.4g} seconds.")
+                    print(f"{sig_strength} [num features: {n_feat}, train size: {train_size}, val size: {val_size}]: {np.mean(results[s, ts, m, n, :, 1]):#.4g} ± {np.std(results[s, ts, m, n, :, 1]):#.4g} ({results[s, ts, m, n, :, 1]}). Training in {np.mean(times[s, ts, m, n]):#.4g} ± {np.std(times[s, ts, m, n]):#.4g} seconds.")
             del traces_trainval, traces_test 
                     
     return times, results
