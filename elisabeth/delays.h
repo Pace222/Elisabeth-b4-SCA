@@ -36,5 +36,6 @@ static inline void delay_operation(){
 
 void init_chain(uint8_t*, size_t);
 void new_encryption(uint4_t*);
+void print_delays();
 
 #endif

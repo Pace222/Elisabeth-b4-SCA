@@ -772,6 +772,9 @@ void scenario_whitening_and_filter_delayed() {
         return;
     }
 
+    new_encryption(buf_arg);
+    print_delays();
+
     for (int i = 0; i < repeat; i++) {
       new_encryption(buf_arg);
       benchmark_whitening_and_filter_delayed(buf_out, buf_arg, chosen_rng);

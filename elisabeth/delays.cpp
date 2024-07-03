@@ -19,8 +19,6 @@ void hash(void* dest, void* src, size_t src_len) {
 }
 
 void compute_delays(int compute_bias) {
-    if (!compute_bias)
-        printf("(");
     for (int i = 0; i < N_OPERATIONS; i += HASH_SIZE) {
         for (int j = 0; j < HASH_SIZE; ++j) {
             if (i + j >= N_OPERATIONS)
@@ -28,14 +26,8 @@ void compute_delays(int compute_bias) {
             if (compute_bias)
                 bias[i + j] = hash_chain[j] & 0b111111000;
             delays[i + j] = bias[i + j] | (hash_chain[j] & 0b111);
-            if (!compute_bias)
-                printf("%hX;", delays[i + j]);
         }
         hash(hash_chain, hash_chain, sizeof(hash_chain));
-    }
-    if (!compute_bias) {
-        printf(")");
-        fflush(stdout);
     }
 }
 
@@ -54,4 +46,18 @@ void new_encryption(uint4_t* new_key) {
     }
 
     delay_head = 0;
+}
+
+
+void print_delays() {
+    printf("(");
+    for (int i = 0; i < N_OPERATIONS; ++i) {
+        printf("%hX", delays[i]);
+        if (i < N_OPERATIONS - 1) {
+            printf(";");
+        }
+    }
+
+    printf(")");
+    fflush(stdout);
 }
