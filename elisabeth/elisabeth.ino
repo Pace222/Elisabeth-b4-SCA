@@ -1,8 +1,9 @@
 extern "C" {
-  #include "encryption.h"
   #include "generator_aes.h"
   #include "generator_cha.h"
 }
+#include "delays.h"
+#include "encryption.h"
 
 // Define Interrupt pin
 #define interruptPIN A1
@@ -17,7 +18,7 @@ void benchmark_whitening(uint4_t* keyround, uint4_t* key, rng* r) {
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
-  digitalWrite(TriggerPQ, HIGH);  
+  digitalWrite(TriggerPQ, HIGH);
 
   random_whitened_subset(keyround, key, r);
 
@@ -140,6 +141,27 @@ void benchmark_masked_shuffled_whitening_and_filter(packed* key_el, packed* key,
 
   masked_shuffled_random_whitened_subset(keyround, key, r);
   packed res = masked_shuffled_filter(keyround, r->mode);
+
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);
+  delayMicroseconds(50);
+  interrupts();
+
+  *key_el = res;
+}
+
+void benchmark_whitening_and_filter_delayed(uint4_t* key_el, uint4_t* key, rng* r) {
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+  noInterrupts();
+  //Run the trigger Low to High
+  digitalWrite(TriggerPQ, LOW);
+  delayMicroseconds(TRIGGER_DELAY);
+  digitalWrite(TriggerPQ, HIGH);  
+
+  random_whitened_subset_delayed(keyround, key, r);
+  uint4_t res = filter_delayed(keyround, r->mode);
 
   //Run the trigger Low to High
   digitalWrite(TriggerPQ, LOW);
@@ -736,6 +758,25 @@ void scenario_masked_shuffled_whitening_and_filter() {
     }
 }
 
+void scenario_whitening_and_filter_delayed() {
+    // Format: [0-9A-Fa-f]. arg1 is the key. Output is the output of the filtering function. Expects to have filled the random table in a previous command.
+    if (fill_array_from_user_hex(buf_arg, KEY_WIDTH, DELIMITER) != KEY_WIDTH) {
+        print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the key (SIZE: " + String(KEY_WIDTH) + " nibbles). Output is the output of the filtering function (SIZE: " + String(sizeof(uint4_t)) + " nibbles). Expects to have filled the random table in a previous command.");
+        return;
+    }
+
+    new_encryption(buf_arg);
+
+    for (int i = 0; i < repeat; i++) {
+      benchmark_whitening_and_filter_delayed(buf_out, buf_arg, chosen_rng);
+
+      Serial.print(buf_out[0], HEX);
+      if (i < repeat - 1) {
+        Serial.print(DELIMITER);
+      }
+    }
+}
+
 void scenario_addition() {
     // Format: [0-9A-Fa-f],[0-9A-Fa-f]. arg1 is a single element of the plaintext, arg2 is the output of the filtering function. Output is a single element of the ciphertext.
     if (fill_array_from_user_hex(buf_message, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, 1, DELIMITER) != 1) {
@@ -947,6 +988,7 @@ void setup() {
 
   init_sboxes_4();
   init_sboxes_b4();
+  init_chain((uint8_t *) "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 26);
 
   // Set the trigger PIN
   pinMode(TriggerPQ, OUTPUT);
@@ -1001,6 +1043,9 @@ void process_input() {
     } else if (choice == "3ms") {
       // Benchmark masked and shuffled whitening + full filter function
       scenario_masked_shuffled_whitening_and_filter();
+    } else if (choice == "3d") {
+      // Benchmark delayed whitening + full filter function (PATENT COUNTERMEASURE)
+      scenario_whitening_and_filter_delayed();
     } else if (choice == "4") {
       // Benchmark final addition with plaintext (encryption)
       scenario_addition();

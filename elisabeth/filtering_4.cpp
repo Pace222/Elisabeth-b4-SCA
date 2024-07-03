@@ -45,3 +45,7 @@ uint4_t shuffled_filter_block_4(const uint4_t* block) {
 packed masked_shuffled_filter_block_4(const packed* block_shares) {
     return 0;
 }
+
+uint4_t filter_block_4_delayed(const uint4_t* block) {
+    return 0;
+}

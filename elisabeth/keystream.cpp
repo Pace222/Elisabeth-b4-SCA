@@ -1,4 +1,5 @@
 #include "keystream.h"
+#include "delays.h"
 
 void random_whitened_subset(uint4_t* keyround, const uint4_t* key, const rng* r) {
     int KEYROUND_WIDTH = r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
@@ -45,6 +46,16 @@ void masked_shuffled_random_whitened_subset(packed* keyround, const packed* key,
         final_index -= cmp * loop_bound;
 
         keyround[final_index] = masked_addition_constant(key[r->indices[final_index]], r->whitening[final_index]);
+    }
+}
+
+void random_whitened_subset_delayed(uint4_t* keyround, const uint4_t* key, const rng* r) {
+    int KEYROUND_WIDTH = r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
+
+    // Apply the whitening mask to the selected subset
+    for (int i = 0; i < KEYROUND_WIDTH; i++) {
+        delay_operation();
+        keyround[i] = uint4_add(key[r->indices[i]], r->whitening[i]);
     }
 }
 
@@ -112,6 +123,19 @@ packed masked_shuffled_filter(const packed* keyround_shares, int mode) {
         res_key_shares = masked_addition(res_key_shares, masked_shuffled_filter_block(block));               // res_key = uint4_add(res_key, filter_block(block));
     }
     return res_key_shares;
+}
+
+uint4_t filter_delayed(const uint4_t* keyround, int mode) {
+    int KEYROUND_WIDTH = mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
+    int BLOCK_WIDTH = mode ? BLOCK_WIDTH_4 : BLOCK_WIDTH_B4;
+    uint4_t (*filter_block) (const uint4_t*) = mode ? filter_block_4_delayed : filter_block_b4_delayed;
+
+    // Split the keyround into blocks of size BLOCK_WIDTH and apply function filter_block for each block
+    uint4_t res_key = uint4_new(0);
+    for (const uint4_t* block = keyround; block < keyround + KEYROUND_WIDTH; block += BLOCK_WIDTH) {
+        res_key = uint4_add(res_key, filter_block(block));
+    }
+    return res_key;
 }
 
 /*uint4_t filter_par(uint4_t* keyround) {

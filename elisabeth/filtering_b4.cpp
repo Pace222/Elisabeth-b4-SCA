@@ -2,6 +2,7 @@
 
 #include "filtering_b4.h"
 #include "masking.h"
+#include "delays.h"
 
 uint4_t S_BOXES_B4_WITH_SHARES[18][16][16];
 
@@ -662,4 +663,56 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
         res_shares = masked_addition(res_shares, masked_sbox_first_order(t_shares[final_index], S_BOXES_B4_WITH_SHARES[final_index + 2*new_width]));               // res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
     }
     return res_shares;
+}
+
+uint4_t filter_block_b4_delayed(const uint4_t* block) {
+    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    uint4_t x[BLOCK_WIDTH_B4];
+    for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
+        delay_operation();
+        x[i] = block[i];
+    }
+    uint4_t y[new_width];
+    uint4_t z[new_width];
+    uint4_t t[new_width];
+    uint4_t res;
+
+    for (int i = 0; i < new_width / 2; i++) {
+        x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
+    }
+
+    for (int i = 0; i < new_width; i++) {
+        delay_operation();
+        y[i] = S_BOXES_B4[i][x[i]];
+    }
+
+    for (int i = 0; i < new_width / 2; i++) {
+        z[2*i] = uint4_add(y[(2*i + 5) % new_width], y[2*i]);
+        z[2*i + 1] = uint4_add(y[(2*i + 4) % new_width], y[2*i + 1]);
+    }
+
+    for (int i = 0; i < new_width; i++) {
+        z[i] = uint4_add(z[i], x[(i + 2) % new_width]);
+        z[i] = S_BOXES_B4[i + new_width][z[i]];
+    }
+
+    for (int i = 0; i < new_width / 3; i++) {
+        t[3*i] = uint4_add(uint4_add(z[3*i], z[3*i + 1]), z[3*i + 2]);
+        t[3*i + 1] = uint4_add(z[3*i + 1], z[(3*i + 3) % new_width]);
+        t[3*i + 2] = uint4_add(uint4_add(z[3*i + 2], z[(3*i + 3) % new_width]), y[3*i]);
+    }
+
+    t[0] = uint4_add(t[0], x[5]);
+    t[1] = uint4_add(t[1], x[4]);
+    t[2] = uint4_add(t[2], x[3]);
+    t[3] = uint4_add(t[3], x[1]);
+    t[4] = uint4_add(t[4], x[0]);
+    t[5] = uint4_add(t[5], x[2]);
+
+    delay_operation();
+    res = x[new_width];
+    for (int i = 0; i < new_width; i++) {
+        res = uint4_add(res, S_BOXES_B4[i + 2*new_width][t[i]]);
+    }
+    return res;
 }
