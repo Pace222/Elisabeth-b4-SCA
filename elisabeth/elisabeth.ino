@@ -1,3 +1,4 @@
+#include <Profiler.h>
 #include "generator_aes.h"
 #include "generator_cha.h"
 #include "delays.h"
@@ -171,6 +172,21 @@ void benchmark_whitening_and_filter_delayed(uint4_t* key_el, uint4_t* key, rng* 
   *key_el = res;
 }
 
+void profiled_whitening_and_filter_delayed(uint4_t* key_el, uint4_t* key, rng* r) {
+  uint4_t keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+
+  {
+    profiler_t p;
+    random_whitened_subset_delayed(keyround, key, r);
+  }
+  {
+    profiler_t p;
+    uint4_t res = filter_delayed(keyround, r->mode);
+    *key_el = res;
+  }
+}
+
+
 void benchmark_addition(uint4_t* cipher_el, uint4_t plain_el, uint4_t key_el) {
   noInterrupts();
   //Run the trigger Low to High
@@ -298,6 +314,8 @@ void benchmark_test_sbox(uint4_t* output, uint4_t index, uint4_t* input) {
 
   *output = res;
 }
+
+#define DEVICE_SECRET_SIZE AES_KEYLEN
 
 #define MAX_MESSAGE_SIZE 16
 
@@ -777,7 +795,7 @@ void scenario_whitening_and_filter_delayed() {
 
     for (int i = 0; i < repeat; i++) {
       new_encryption(buf_arg);
-      benchmark_whitening_and_filter_delayed(buf_out, buf_arg, chosen_rng);
+      profiled_whitening_and_filter_delayed(buf_out, buf_arg, chosen_rng);
 
       Serial.print(buf_out[0], HEX);
       if (i < repeat - 1) {
@@ -942,7 +960,7 @@ void scenario_decrypt_message() {
 void scenario_fill_rnd_table_aes() {
   // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
   if (fill_array_from_user_hex_bytes(buf_seed_1, AES_KEYLEN, DELIMITER) != AES_KEYLEN) {
-      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
+      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(AES_KEYLEN) + " bytes). No output.");
       return;
   }
 
@@ -957,7 +975,7 @@ void scenario_fill_rnd_table_aes() {
 void scenario_fill_rnd_table_chacha() {
   // Format: [0-9A-Fa-f]. arg1 is the seed for the PRNG (IV). No output.
   if (fill_array_from_user_hex_bytes(buf_seed_1, CHACHA_KEYLEN, DELIMITER) != CHACHA_KEYLEN) {
-      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). No output.");
+      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the seed for the PRNG (IV) (SIZE: " + String(CHACHA_KEYLEN) + " bytes). No output.");
       return;
   }
 
@@ -969,10 +987,20 @@ void scenario_fill_rnd_table_chacha() {
   chosen_rng = &rng_list.l.cha[0].r;
 }
 
+void scenario_set_device_secret() {
+  // Format: [0-9A-Fa-f]. arg1 is the device secret for the initialization of the countermeasure's hash chain. No output.
+  if (fill_array_from_user_hex_bytes(buf_seed_1, DEVICE_SECRET_SIZE, DELIMITER) != DEVICE_SECRET_SIZE) {
+      print_format(mode, choice, "[0-9A-Fa-f]", "arg1 is the device secret for the initialization of the countermeasure's hash chain (SIZE: " + String(DEVICE_SECRET_SIZE) + " bytes). No output.");
+      return;
+  }
+
+  init_chain(buf_seed_1, DEVICE_SECRET_SIZE);
+}
+
 void scenario_test_sbox() {
   // Format: [0-5],[0-9A-Fa-f],[0-9A-Fa-f]. arg1 is the S-Box index, arg2 is the input to the S-Box. Output is the output of the S-Box.
   if (fill_array_from_user_hex(buf_seed_1, 1, DELIMITER) != 1 || fill_array_from_user_hex(buf_arg, 1, DELIMITER) != 1 || buf_seed_1[0] < 0 || buf_seed_1[0] > 5) {
-    print_format(mode, choice, "[0-5],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the S-Box index (SIZE: 1 + " + String(1) + " nibbles), arg2 is the input to the S-Box (SIZE: 1 + " + String(1) + " nibbles). Output is the output of the S-Box.""arg1 is the seed for the PRNG (IV) (SIZE: " + String(2 * AES_KEYLEN) + " nibbles). Output is the output of the S-Box.");
+    print_format(mode, choice, "[0-5],[0-9A-Fa-f],[0-9A-Fa-f]", "arg1 is the S-Box index (SIZE: 1 + " + String(1) + " nibbles), arg2 is the input to the S-Box (SIZE: 1 + " + String(1) + " nibbles). Output is the output of the S-Box.");
     return;
   }
 
@@ -1078,13 +1106,16 @@ void process_input() {
       // Benchmark complete decryption, full message
       scenario_decrypt_message();
     } else if (choice == "genRndAES") {
-      // Fill a table with random values for faster subsequent lookups with AES.
+      // Fill a table with random values for faster subsequent lookups with AES
       scenario_fill_rnd_table_aes();
     } else if (choice == "genRndChacha") {
-      // Fill a table with random values for faster subsequent lookups with Chacha.
+      // Fill a table with random values for faster subsequent lookups with Chacha
       scenario_fill_rnd_table_chacha();
+    } else if (choice == "setSecret") {
+      // Initialize the hash chain with a device secret for our countermeasure
+      scenario_set_device_secret();
     } else if (choice == "testSBox") {
-      // Run a given S-Box to test it.
+      // Run a given S-Box to test it
       scenario_test_sbox();
     } else {
       print_format(mode, "\0", "arg1,arg2,arg3,...", "Arguments depend on the benchmark.");
