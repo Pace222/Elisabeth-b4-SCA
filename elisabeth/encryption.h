@@ -3,12 +3,12 @@
 
 #include <stddef.h>
 
-    #include "masking.h"
+#include "masking.h"
 #include "keystream.h"
 
-void encrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng** r, size_t);
-void masked_encrypt(packed*, const packed*, const packed*, const rng** r, size_t length);
-void decrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng** r, size_t);
-void masked_decrypt(packed*, const packed*, const packed*, const rng** r, size_t length);
+void encrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng**, int);
+void masked_encrypt(packed*, const packed*, const packed*, const rng**, int);
+void decrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng**, int);
+void masked_decrypt(packed*, const packed*, const packed*, const rng**, int);
 
 #endif

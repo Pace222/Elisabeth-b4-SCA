@@ -2,7 +2,7 @@
 
 #include "encryption.h"
 
-void encrypt(uint4_t* ciphertext, const uint4_t* plaintext, const uint4_t* key, const rng** r, size_t length) {
+void encrypt(uint4_t* ciphertext, const uint4_t* plaintext, const uint4_t* key, const rng** r, int length) {
     int KEYROUND_WIDTH = r[0]->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
 
     for (int i = 0; i < length; i++) {
@@ -13,7 +13,7 @@ void encrypt(uint4_t* ciphertext, const uint4_t* plaintext, const uint4_t* key, 
     }
 }
 
-void masked_encrypt(packed* ciphertext, const packed* plaintext, const packed* key, const rng** r, size_t length) {
+void masked_encrypt(packed* ciphertext, const packed* plaintext, const packed* key, const rng** r, int length) {
     int KEYROUND_WIDTH = r[0]->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
 
     for (int i = 0; i < length; i++) {
@@ -24,7 +24,7 @@ void masked_encrypt(packed* ciphertext, const packed* plaintext, const packed* k
     }
 }
 
-void decrypt(uint4_t* decrypted, const uint4_t* ciphertext, const uint4_t* key, const rng** r, size_t length) {
+void decrypt(uint4_t* decrypted, const uint4_t* ciphertext, const uint4_t* key, const rng** r, int length) {
     int KEYROUND_WIDTH = r[0]->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
 
     for (int i = 0; i < length; i++) {
@@ -35,7 +35,7 @@ void decrypt(uint4_t* decrypted, const uint4_t* ciphertext, const uint4_t* key, 
     }
 }
 
-void masked_decrypt(packed* decrypted, const packed* ciphertext, const packed* key, const rng** r, size_t length) {
+void masked_decrypt(packed* decrypted, const packed* ciphertext, const packed* key, const rng** r, int length) {
     int KEYROUND_WIDTH = r[0]->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4;
 
     for (int i = 0; i < length; i++) {
