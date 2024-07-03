@@ -5,7 +5,7 @@
 
 #define N_OPERATIONS KEYROUND_WIDTH_B4 * 3
 
-extern uint16_t delays[N_OPERATIONS];
+extern uint8_t delays[N_OPERATIONS];
 extern size_t delay_head;
 
 static inline void delay_operation(void) __attribute__((always_inline, unused));
@@ -15,7 +15,7 @@ static inline void delay_operation(){
      * for Teensy 3.0 (http://www.pjrc.com/)
      */
 
-    uint16_t n = delays[delay_head++];
+    uint8_t n = delays[delay_head++];
     if (n == 0) return;
     asm volatile(
         "L_%=_delay_operation:"       "\n\t"

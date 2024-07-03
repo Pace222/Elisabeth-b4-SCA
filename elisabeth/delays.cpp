@@ -3,13 +3,13 @@
 #include <string.h>
 
 #include "SHA512.h"
-#define HASH_SIZE SHA512::HASH_SIZE / 2
+#define HASH_SIZE SHA512::HASH_SIZE
 SHA512 H;
 
-uint16_t delays[N_OPERATIONS];
+uint8_t delays[N_OPERATIONS];
 size_t delay_head;
-uint16_t bias[N_OPERATIONS];
-uint16_t hash_chain[HASH_SIZE];
+uint8_t bias[N_OPERATIONS];
+uint8_t hash_chain[HASH_SIZE];
 uint4_t prev_key[KEY_WIDTH_B4];
 
 void hash(void* dest, void* src, size_t src_len) {
@@ -24,7 +24,7 @@ void compute_delays(int compute_bias) {
             if (i + j >= N_OPERATIONS)
                 break;
             if (compute_bias)
-                bias[i + j] = hash_chain[j] & 0b111111000;
+                bias[i + j] = hash_chain[j] & 0b11111000;
             delays[i + j] = bias[i + j] | (hash_chain[j] & 0b111);
         }
         hash(hash_chain, hash_chain, sizeof(hash_chain));
