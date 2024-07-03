@@ -7,7 +7,7 @@
 SHA512 H;
 
 uint16_t delays[N_OPERATIONS];
-size_t head;
+size_t delay_head;
 uint16_t bias[N_OPERATIONS];
 uint16_t hash_chain[HASH_SIZE];
 uint4_t prev_key[KEY_WIDTH_B4];
@@ -44,7 +44,7 @@ void init_chain(uint8_t* device_secret, size_t secret_len) {
     compute_delays(1);
     memset(prev_key, 0, sizeof(prev_key));
 
-    head = 0;
+    delay_head = 0;
 }
 
 void new_encryption(uint4_t* new_key) {
@@ -53,5 +53,5 @@ void new_encryption(uint4_t* new_key) {
         memcpy(prev_key, new_key, sizeof(prev_key));
     }
 
-    head = 0;
+    delay_head = 0;
 }
