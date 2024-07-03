@@ -3,8 +3,8 @@ import sys
 
 import numpy as np
 
-path = r"C:\Users\iot-user\miniconda3\envs\tf-gpu\Lib\site-packages\nvidia\cudnn\bin"
-os.environ['PATH'] += ';'+path
+#path = r"C:\Users\iot-user\miniconda3\envs\tf-gpu\Lib\site-packages\nvidia\cudnn\bin"
+#os.environ['PATH'] += ';'+path
 #import tensorflow as tf
 #from tensorflow.python.client import device_lib
 #devices = device_lib.list_local_devices()
@@ -492,7 +492,8 @@ class ResNetSCA:
 
         self.model = Model(inputs, total, name='extract_resnet')
         #optimizer = Adam(learning_rate=ExponentialDecay(initial_learning_rate=0.001, decay_steps=epochs*dataset_size/PARAMS["batch_size"], decay_rate=0.9))
-        self.model.compile(loss='categorical_crossentropy', optimizer=Adam(), metrics={o.name[:-len('/Softmax:0')]: 'accuracy' for o in total})
+        optimizer = Adam() if not PARAMS["rws"] else Adam(beta_1=0.99)
+        self.model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=["accuracy"]*len(total))
         self.epochs = epochs
         self.dataset_size = dataset_size
 
