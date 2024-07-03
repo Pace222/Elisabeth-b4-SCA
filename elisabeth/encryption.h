@@ -3,9 +3,7 @@
 
 #include <stddef.h>
 
-extern "C" {
     #include "masking.h"
-}
 #include "keystream.h"
 
 void encrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng** r, size_t);

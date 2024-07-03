@@ -1,7 +1,5 @@
-extern "C" {
   #include "generator_aes.h"
   #include "generator_cha.h"
-}
 #include "delays.h"
 #include "encryption.h"
 

@@ -5,10 +5,8 @@
 
 #include "generator.h"
 
-extern "C" {
-    #include "types.h"
-    #include "masking.h"
-}
+#include "types.h"
+#include "masking.h"
 #include "filtering_4.h"
 #include "filtering_b4.h"
 

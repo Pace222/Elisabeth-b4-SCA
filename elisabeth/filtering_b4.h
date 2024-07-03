@@ -1,10 +1,8 @@
 #ifndef FILTERING_B4_H
 #define FILTERING_B4_H
 
-extern "C" {
     #include "types.h"
     #include "masking.h"
-}
 
 static uint4_t S_BOXES_B4[18][16];
 

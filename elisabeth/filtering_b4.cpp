@@ -1,7 +1,6 @@
 #include <stddef.h>
 
 #include "filtering_b4.h"
-#include "masking.h"
 #include "delays.h"
 
 uint4_t S_BOXES_B4_WITH_SHARES[18][16][16];
