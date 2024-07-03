@@ -3,6 +3,7 @@
 #include "filtering_b4.h"
 #include "delays.h"
 
+uint4_t S_BOXES_B4[18][16];
 uint4_t S_BOXES_B4_WITH_SHARES[18][16][16];
 
 void init_sboxes_b4() {
@@ -367,7 +368,7 @@ void init_sboxes_b4() {
 }
 
 uint4_t filter_block_b4(const uint4_t* block) {
-    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
     for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
         x[i] = block[i];
@@ -417,7 +418,7 @@ uint4_t filter_block_b4(const uint4_t* block) {
 
 packed masked_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
-    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    int new_width = BLOCK_WIDTH_B4 - 1;
 
     packed x_shares[BLOCK_WIDTH_B4];
     for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                                                      // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
@@ -468,7 +469,7 @@ packed masked_filter_block_b4(const packed* block_shares) {
 }
 
 uint4_t shuffled_filter_block_b4(const uint4_t* block) {
-    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
     uint4_t y[new_width];
     uint4_t z[new_width];
@@ -567,7 +568,7 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
 
 packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
-    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    int new_width = BLOCK_WIDTH_B4 - 1;
     packed x_shares[BLOCK_WIDTH_B4];
     packed y_shares[new_width];
     packed z_shares[new_width];
@@ -665,7 +666,7 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
 }
 
 uint4_t filter_block_b4_delayed(const uint4_t* block) {
-    size_t new_width = BLOCK_WIDTH_B4 - 1;
+    int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
     for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
         delay_operation();

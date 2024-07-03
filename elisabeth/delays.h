@@ -5,8 +5,8 @@
 
 #define N_OPERATIONS KEYROUND_WIDTH_B4 * 3
 
-static uint16_t delays[N_OPERATIONS];
-static size_t head;
+extern uint16_t delays[N_OPERATIONS];
+extern size_t head;
 
 static inline void delay_operation(void) __attribute__((always_inline, unused));
 static inline void delay_operation(){

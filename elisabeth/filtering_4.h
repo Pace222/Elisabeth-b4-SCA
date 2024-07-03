@@ -1,10 +1,10 @@
 #ifndef FILTERING_4_H
 #define FILTERING_4_H
 
-    #include "types.h"
-    #include "masking.h"
+#include "types.h"
+#include "masking.h"
 
-static uint4_t S_BOXES_4[8][16];
+extern uint4_t S_BOXES_4[8][16];
 
 void init_sboxes_4();
 uint4_t filter_block_4(const uint4_t*);

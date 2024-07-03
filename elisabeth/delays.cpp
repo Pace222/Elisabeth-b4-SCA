@@ -5,6 +5,8 @@
 #define HASH_SIZE SHA512::HASH_SIZE / 2
 SHA512 H;
 
+uint16_t delays[N_OPERATIONS];
+size_t head;
 uint16_t bias[N_OPERATIONS];
 uint16_t hash_chain[HASH_SIZE];
 uint4_t prev_key[KEYROUND_WIDTH_B4];
