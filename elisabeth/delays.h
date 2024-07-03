@@ -15,14 +15,23 @@ static inline void delay_operation(){
      * for Teensy 3.0 (http://www.pjrc.com/)
      */
 
-    uint16_t n = delays[head++] / 3;
+    uint16_t n = delays[head++];
     if (n == 0) return;
     asm volatile(
         "L_%=_delay_operation:"       "\n\t"
         "subs   %0, #1"               "\n\t"
         "bne    L_%=_delay_operation" "\n"
         : "+r" (n) :
+        : "cc"
     );
+    // LOCAL
+    /*asm volatile(
+        "L_%=_delay_operation:"       "\n\t"
+        "sub   $1, %0"                "\n\t"
+        "jne    L_%=_delay_operation" "\n"
+        : "+r" (n) :
+        : "cc"
+    );*/
 }
 
 void init_chain(uint8_t*, size_t);
