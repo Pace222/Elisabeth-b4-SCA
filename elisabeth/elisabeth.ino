@@ -502,6 +502,7 @@ void print_format(int mode, String choice, String arguments, String description)
     Serial.println("  genRndChacha: Fill a table with random values for faster subsequent lookups with Chacha");
     Serial.println("  testSBox    : Run a given S-Box to test it");
   }
+  Serial.flush();
 }
 
 void recv_input() {
@@ -617,6 +618,7 @@ void scenario_whitening() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -634,6 +636,7 @@ void scenario_filter_block() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -651,6 +654,7 @@ void scenario_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -668,6 +672,7 @@ void scenario_whitening_and_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -690,6 +695,7 @@ void scenario_masked_whitening_and_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -712,6 +718,7 @@ void scenario_masked_null_whitening_and_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -731,6 +738,7 @@ void scenario_shuffled_whitening_and_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -753,6 +761,7 @@ void scenario_masked_shuffled_whitening_and_filter() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -771,6 +780,7 @@ void scenario_whitening_and_filter_delayed() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -788,6 +798,7 @@ void scenario_addition() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -805,6 +816,7 @@ void scenario_subtraction() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -822,6 +834,7 @@ void scenario_encrypt_elem() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -839,6 +852,7 @@ void scenario_decrypt_elem() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -878,6 +892,7 @@ void scenario_encrypt_message() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -917,6 +932,7 @@ void scenario_decrypt_message() {
       if (i < repeat - 1) {
         Serial.print(DELIMITER);
       }
+      Serial.flush();
     }
 }
 
@@ -933,8 +949,6 @@ void scenario_fill_rnd_table_aes() {
   rng_new_aes(&rng_list.l.aes[0], buf_seed_2, mode);
 
   chosen_rng = &rng_list.l.aes[0].r;
-
-  //Serial.print("1");
 }
 
 void scenario_fill_rnd_table_chacha() {
@@ -950,8 +964,6 @@ void scenario_fill_rnd_table_chacha() {
   rng_new_cha(&rng_list.l.cha[0], buf_seed_2, mode);
 
   chosen_rng = &rng_list.l.cha[0].r;
-
-  //Serial.print("1");
 }
 
 void scenario_test_sbox() {
@@ -970,6 +982,7 @@ void scenario_test_sbox() {
     if (i < repeat - 1) {
       Serial.print(DELIMITER);
     }
+    Serial.flush();
   }
 }
 
