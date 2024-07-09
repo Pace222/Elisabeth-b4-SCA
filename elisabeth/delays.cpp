@@ -13,7 +13,7 @@ struct hash_key {
 
 uint8_t delays[N_OPERATIONS];
 size_t delay_head;
-uint8_t bias[N_OPERATIONS];
+uint8_t bias;
 struct hash_key hash_chain_and_prev_key;
 
 void hash(void* dest, void* src, size_t src_len) {
@@ -22,14 +22,13 @@ void hash(void* dest, void* src, size_t src_len) {
     H.finalize(dest, HASH_SIZE);
 }
 
-void compute_delays(int compute_bias) {
+void compute_delays() {
     for (int i = 0; i < N_OPERATIONS; i += HASH_SIZE) {
         for (int j = 0; j < HASH_SIZE; ++j) {
             if (i + j >= N_OPERATIONS)
                 break;
-            if (compute_bias)
-                bias[i + j] = hash_chain_and_prev_key.hash_chain[j] & 0b11111000;
-            delays[i + j] = bias[i + j] | (hash_chain_and_prev_key.hash_chain[j] & 0b111);
+
+            delays[i + j] = bias | (hash_chain_and_prev_key.hash_chain[j] & 0b111);
         }
         hash(&hash_chain_and_prev_key.hash_chain, &hash_chain_and_prev_key, sizeof(hash_chain_and_prev_key));
     }
@@ -37,8 +36,9 @@ void compute_delays(int compute_bias) {
 
 void init_chain(uint8_t* device_secret, size_t secret_len) {
     hash(&hash_chain_and_prev_key.hash_chain, device_secret, secret_len);
+    bias = hash_chain_and_prev_key.hash_chain[0] & 0b11111000;
     memset(&hash_chain_and_prev_key.prev_key, 0, sizeof(hash_chain_and_prev_key.prev_key));
-    compute_delays(1);
+    compute_delays();
 
     delay_head = 0;
 }
@@ -46,7 +46,7 @@ void init_chain(uint8_t* device_secret, size_t secret_len) {
 void new_encryption(uint4_t* new_key) {
     if (memcmp(hash_chain_and_prev_key.prev_key, new_key, sizeof(hash_chain_and_prev_key.prev_key))) {
         memcpy(hash_chain_and_prev_key.prev_key, new_key, sizeof(hash_chain_and_prev_key.prev_key));
-        compute_delays(0);
+        compute_delays();
     }
 
     delay_head = 0;
