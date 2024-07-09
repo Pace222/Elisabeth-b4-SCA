@@ -6,16 +6,20 @@
 #define HASH_SIZE SHA512::HASH_SIZE
 SHA512 H;
 
+struct hash_key {
+    uint8_t hash_chain[HASH_SIZE];
+    uint4_t prev_key[KEY_WIDTH_B4];
+};
+
 uint8_t delays[N_OPERATIONS];
 size_t delay_head;
 uint8_t bias[N_OPERATIONS];
-uint8_t hash_chain[HASH_SIZE];
-uint4_t prev_key[KEY_WIDTH_B4];
+struct hash_key hash_chain_and_prev_key;
 
 void hash(void* dest, void* src, size_t src_len) {
     H.reset();
     H.update(src, src_len);
-    H.finalize(dest, 2 * HASH_SIZE);
+    H.finalize(dest, HASH_SIZE);
 }
 
 void compute_delays(int compute_bias) {
@@ -24,25 +28,25 @@ void compute_delays(int compute_bias) {
             if (i + j >= N_OPERATIONS)
                 break;
             if (compute_bias)
-                bias[i + j] = hash_chain[j] & 0b11111000;
-            delays[i + j] = bias[i + j] | (hash_chain[j] & 0b111);
+                bias[i + j] = hash_chain_and_prev_key.hash_chain[j] & 0b11111000;
+            delays[i + j] = bias[i + j] | (hash_chain_and_prev_key.hash_chain[j] & 0b111);
         }
-        hash(hash_chain, hash_chain, sizeof(hash_chain));
+        hash(&hash_chain_and_prev_key.hash_chain, &hash_chain_and_prev_key, sizeof(hash_chain_and_prev_key));
     }
 }
 
 void init_chain(uint8_t* device_secret, size_t secret_len) {
-    hash(hash_chain, device_secret, secret_len);
+    hash(&hash_chain_and_prev_key.hash_chain, device_secret, secret_len);
+    memset(&hash_chain_and_prev_key.prev_key, 0, sizeof(hash_chain_and_prev_key.prev_key));
     compute_delays(1);
-    memset(prev_key, 0, sizeof(prev_key));
 
     delay_head = 0;
 }
 
 void new_encryption(uint4_t* new_key) {
-    if (memcmp(prev_key, new_key, sizeof(prev_key))) {
+    if (memcmp(hash_chain_and_prev_key.prev_key, new_key, sizeof(hash_chain_and_prev_key.prev_key))) {
+        memcpy(hash_chain_and_prev_key.prev_key, new_key, sizeof(hash_chain_and_prev_key.prev_key));
         compute_delays(0);
-        memcpy(prev_key, new_key, sizeof(prev_key));
     }
 
     delay_head = 0;
