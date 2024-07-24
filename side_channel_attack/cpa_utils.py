@@ -192,18 +192,19 @@ def hypothesis_b4_rws_sboxes_location_hd(iv: str, key: List[int], round_idx: int
         return HD[block[block_idx] + sbox_out][(block[block_idx] + sbox_out) % 16]
 
 def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.ndarray, filename: str) -> np.ndarray:
-    correlation_locations = [[[0] * 10] * BLOCK_WIDTH_B4] * (KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4 - 2)
+    correlation_locations = []
     for round_idx in range(len(correlation_locations), KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
         corr_round = []
         for block_idx in range(BLOCK_WIDTH_B4):
+            print(round_idx * BLOCK_WIDTH_B4 + block_idx, end="")
             hyps = np.array([hypothesis_b4_rws_sboxes_location_hw(iv, key, round_idx, block_idx) for i, key in enumerate(real_keys) for iv in seeds[i]])
             corr = corr_coef(hyps, traces.reshape((-1, traces.shape[2])))
             loc = np.argmax(corr)
             corr_round.append(list(range(loc - 5, loc + 5)))
-            plt.plot(corr)
-            plt.ylim([-0.5, 0.5])
-            plt.title(f"Round {round_idx}, Block {block_idx}, Location: {loc}")
-            plt.show()
+            #plt.plot(corr)
+            #plt.ylim([-0.5, 0.5])
+            #plt.title(f"Round {round_idx}, Block {block_idx}, Location: {loc}")
+            #plt.show()
         correlation_locations.append(corr_round)
     correlation_locations = np.array(correlation_locations)
 
