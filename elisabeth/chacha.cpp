@@ -1,3 +1,4 @@
+// SOURCE: Hervé Pelletier - PQ_Kyber
 #include <stdint.h>
 #include "chacha.h"
 

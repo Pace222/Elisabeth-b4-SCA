@@ -5,7 +5,7 @@
 
 #define N_OPERATIONS KEYROUND_WIDTH_B4 * 3
 
-extern uint8_t delays[N_OPERATIONS];
+extern uint8_t delays[N_OPERATIONS];           /* Table with delays for every operation */
 extern size_t delay_head;
 
 static inline void delay_operation(void) __attribute__((always_inline, unused));
@@ -24,14 +24,6 @@ static inline void delay_operation(){
         : "+r" (n) :
         : "cc"
     );
-    // LOCAL
-    /*asm volatile(
-        "L_%=_delay_operation:"       "\n\t"
-        "sub   $1, %0"                "\n\t"
-        "jne    L_%=_delay_operation" "\n"
-        : "+r" (n) :
-        : "cc"
-    );*/
 }
 
 void init_chain(uint8_t*, size_t);

@@ -179,7 +179,7 @@ void scenario_filter() {
 /**
  * \brief          Set the trigger for the oscilloscope before running the complete algorithm that generates the keystream: RWS and the 14 rounds
  * \note           This function does not return a value, it stores it to a pointer instead
- * \param[out]     key_el: Output variable used to store the output the keystream
+ * \param[out]     key_el: Output variable used to store the keystream
  * \param[in]      key: The key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
@@ -228,8 +228,8 @@ void scenario_whitening_and_filter() {
  * \brief          Set the trigger for the oscilloscope before running the complete algorithm that generates the keystream: RWS and the 14 rounds,
  *                 protected with 2-share arithmetic masking
  * \note           This function does not return a value, it stores it to a pointer instead
- * \param[out]     key_el: Output variable used to store the output the keystream
- * \param[in]      key: The key
+ * \param[out]     key_el: Output variable used to store the masked keystream
+ * \param[in]      key: The masked key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
 void benchmark_masked_whitening_and_filter(packed* key_el, packed* key, rng* r) {
@@ -313,7 +313,7 @@ void scenario_masked_null_whitening_and_filter() {
  * \brief          Set the trigger for the oscilloscope before running the complete algorithm that generates the keystream: RWS and the 14 rounds,
  *                 protected with shuffling
  * \note           This function does not return a value, it stores it to a pointer instead
- * \param[out]     key_el: Output variable used to store the output the keystream
+ * \param[out]     key_el: Output variable used to store the keystream
  * \param[in]      key: The key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
@@ -365,8 +365,8 @@ void scenario_shuffled_whitening_and_filter() {
  * \brief          Set the trigger for the oscilloscope before running the complete algorithm that generates the keystream: RWS and the 14 rounds,
  *                 protected with 2-share arithmetic masking and shuffling
  * \note           This function does not return a value, it stores it to a pointer instead
- * \param[out]     key_el: Output variable used to store the output the keystream
- * \param[in]      key: The key
+ * \param[out]     key_el: Output variable used to store the masked keystream
+ * \param[in]      key: The masked key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
 void benchmark_masked_shuffled_whitening_and_filter(packed* key_el, packed* key, rng* r) {
@@ -421,7 +421,7 @@ void scenario_masked_shuffled_whitening_and_filter() {
  * \brief          Set the trigger for the oscilloscope before running the complete algorithm that generates the keystream: RWS and the 14 rounds,
  *                 protected with our novel countermeasure, using delays
  * \note           This function does not return a value, it stores it to a pointer instead
- * \param[out]     key_el: Output variable used to store the output the keystream
+ * \param[out]     key_el: Output variable used to store the keystream
  * \param[in]      key: The key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */

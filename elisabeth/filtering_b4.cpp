@@ -6,6 +6,9 @@
 uint4_t S_BOXES_B4[18][16];
 uint4_t S_BOXES_B4_WITH_SHARES[18][16][16];
 
+/**
+ * \brief          Initialize the `S_BOXES_B4` and `S_BOXES_B4_WITH_SHARES` tables
+ */
 void init_sboxes_b4() {
     uint8_t s_boxes_8_t[18][16] = {
         {0x0A, 0x06, 0x0B, 0x08, 0x04, 0x09, 0x08, 0x0C, 0x06, 0x0A, 0x05, 0x08, 0x0C, 0x07, 0x08, 0x04},
@@ -367,6 +370,11 @@ void init_sboxes_b4() {
     }
 }
 
+/**
+ * \brief          Elisabeth-b4 filter function (one round)
+ * \param[in]      block: The input block
+ * \return         The filter function output
+ */
 uint4_t filter_block_b4(const uint4_t* block) {
     int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
@@ -416,6 +424,12 @@ uint4_t filter_block_b4(const uint4_t* block) {
     return res;
 }
 
+/**
+ * \brief          Elisabeth-b4 2-share arithmetic masked filter function (one round)
+ * \note           Not implemented
+ * \param[in]      block_shares: The masked input block
+ * \return         The masked filter function output
+ */
 packed masked_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
     int new_width = BLOCK_WIDTH_B4 - 1;
@@ -468,6 +482,12 @@ packed masked_filter_block_b4(const packed* block_shares) {
     return res_shares;
 }
 
+/**
+ * \brief          Elisabeth-b4 shuffled filter function (one round)
+ * \note           Not implemented
+ * \param[in]      block: The input block
+ * \return         The filter function output
+ */
 uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];
@@ -566,6 +586,12 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
     return res;
 }
 
+/**
+ * \brief          Elisabeth-b4 2-share arithmetic masked and shuffled filter function (one round)
+ * \note           Not implemented
+ * \param[in]      block_shares: The masked input block
+ * \return         The masked filter function output
+ */
 packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     // Protection under second order DPA
     int new_width = BLOCK_WIDTH_B4 - 1;
@@ -665,6 +691,12 @@ packed masked_shuffled_filter_block_b4(const packed* block_shares) {
     return res_shares;
 }
 
+/**
+ * \brief          Elisabeth-b4 delayed filter function (one round) according to our countermeasure
+ * \note           Not implemented
+ * \param[in]      block: The input block
+ * \return         The filter function output
+ */
 uint4_t filter_block_b4_delayed(const uint4_t* block) {
     int new_width = BLOCK_WIDTH_B4 - 1;
     uint4_t x[BLOCK_WIDTH_B4];

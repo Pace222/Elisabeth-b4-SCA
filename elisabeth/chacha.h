@@ -1,3 +1,4 @@
+// SOURCE: Hervé Pelletier - PQ_Kyber
 #define CHACHA_KEYLEN 16
 
 typedef struct
