@@ -29,9 +29,9 @@ struct aes_or_cha_list {
 
 uint8_t buf_seed_1[AES_KEYLEN], buf_seed_2[AES_KEYLEN];
 uint4_t buf_message[MAX_MESSAGE_SIZE], buf_out[MAX_MESSAGE_SIZE];
-packed buf_out_shares[MAX_MESSAGE_SIZE];
+masked buf_out_shares[MAX_MESSAGE_SIZE];
 uint4_t buf_arg[KEY_WIDTH_B4];
-packed buf_shares[KEY_WIDTH_B4];
+masked buf_shares[KEY_WIDTH_B4];
 aes_or_cha_list rng_list;
 rng* chosen_rng;
 const rng* rng_refs[MAX_MESSAGE_SIZE];
@@ -232,15 +232,15 @@ void scenario_whitening_and_filter() {
  * \param[in]      key: The masked key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
-void benchmark_masked_whitening_and_filter(packed* key_el, packed* key, rng* r) {
-  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+void benchmark_masked_whitening_and_filter(masked* key_el, masked* key, rng* r) {
+  masked keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   masked_random_whitened_subset(keyround, key, r);
-  packed res = masked_filter(keyround, r->mode);
+  masked res = masked_filter(keyround, r->mode);
 
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
@@ -369,15 +369,15 @@ void scenario_shuffled_whitening_and_filter() {
  * \param[in]      key: The masked key
  * \param[in]      r: The instance of a PRNG used in the RWS
  */
-void benchmark_masked_shuffled_whitening_and_filter(packed* key_el, packed* key, rng* r) {
-  packed keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
+void benchmark_masked_shuffled_whitening_and_filter(masked* key_el, masked* key, rng* r) {
+  masked keyround[r->mode ? KEYROUND_WIDTH_4 : KEYROUND_WIDTH_B4];
   noInterrupts();
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);
   digitalWrite(TriggerPQ, HIGH);  
 
   masked_shuffled_random_whitened_subset(keyround, key, r);
-  packed res = masked_shuffled_filter(keyround, r->mode);
+  masked res = masked_shuffled_filter(keyround, r->mode);
 
   digitalWrite(TriggerPQ, LOW);
   delayMicroseconds(TRIGGER_DELAY);

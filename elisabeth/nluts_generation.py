@@ -3,6 +3,10 @@ import random
 
 from typing import List
 
+"""
+Script to generate the Elisabeth-b4 S-Boxes
+"""
+
 def gen_nluts_b4_precompute_shares() -> List[List[int]]:
     nluts_orig = gen_nluts_b4()
     nluts_shares = [[[[] for share in range(16)] for j in range(16)] for i in range(18)]
@@ -13,9 +17,9 @@ def gen_nluts_b4_precompute_shares() -> List[List[int]]:
 
     return nluts_shares
 
-def gen_nluts_b4_packed() -> List[List[int]]:
+def gen_nluts_b4_masked() -> List[List[int]]:
     nluts_orig = gen_nluts_b4()
-    nluts_packed = []
+    nluts_masked = []
     for i in range(18):
         nlut = []
         for j in range(0, 16, 4):
@@ -23,9 +27,9 @@ def gen_nluts_b4_packed() -> List[List[int]]:
             for k in range(4):
                 pack |= nluts_orig[i][j + k] << 8*(3 - k)
             nlut.append(pack)
-        nluts_packed.append(nlut)
+        nluts_masked.append(nlut)
 
-    return nluts_packed
+    return nluts_masked
 
 def gen_nluts_b4() -> List[List[int]]:
     str_seed = "Welcome to Gabriel"

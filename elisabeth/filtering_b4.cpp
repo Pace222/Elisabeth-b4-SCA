@@ -430,19 +430,19 @@ uint4_t filter_block_b4(const uint4_t* block) {
  * \param[in]      block_shares: The masked input block
  * \return         The masked filter function output
  */
-packed masked_filter_block_b4(const packed* block_shares) {
+masked masked_filter_block_b4(const masked* block_shares) {
     // Protection under second order DPA
     int new_width = BLOCK_WIDTH_B4 - 1;
 
-    packed x_shares[BLOCK_WIDTH_B4];
+    masked x_shares[BLOCK_WIDTH_B4];
     for (int i = 0; i < BLOCK_WIDTH_B4; i++) {                                                                                      // for (int i = 0; i < BLOCK_WIDTH_B4; i++) {
         x_shares[i] = block_shares[i];                                                                                              //     x[i] = block[i];
     }                                                                                                                               // }
 
-    packed y_shares[new_width];
-    packed z_shares[new_width];
-    packed t_shares[new_width];
-    packed res_shares;
+    masked y_shares[new_width];
+    masked z_shares[new_width];
+    masked t_shares[new_width];
+    masked res_shares;
 
     for (int i = 0; i < new_width / 2; i++) {
         x_shares[2*i + 1] = masked_addition(x_shares[2*i + 1], x_shares[2*i]);                                                      // x[2*i + 1] = uint4_add(x[2*i + 1], x[2*i]);
@@ -592,14 +592,14 @@ uint4_t shuffled_filter_block_b4(const uint4_t* block) {
  * \param[in]      block_shares: The masked input block
  * \return         The masked filter function output
  */
-packed masked_shuffled_filter_block_b4(const packed* block_shares) {
+masked masked_shuffled_filter_block_b4(const masked* block_shares) {
     // Protection under second order DPA
     int new_width = BLOCK_WIDTH_B4 - 1;
-    packed x_shares[BLOCK_WIDTH_B4];
-    packed y_shares[new_width];
-    packed z_shares[new_width];
-    packed t_shares[new_width];
-    packed res_shares;
+    masked x_shares[BLOCK_WIDTH_B4];
+    masked y_shares[new_width];
+    masked z_shares[new_width];
+    masked t_shares[new_width];
+    masked res_shares;
 
     int start_index, final_index, loop_bound, cmp;
 

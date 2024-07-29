@@ -50,7 +50,7 @@ uint4_t filter_block_4(const uint4_t* block) {
  * \param[in]      block_shares: The masked input block
  * \return         The masked filter function output
  */
-packed masked_filter_block_4(const packed* block_shares) {
+masked masked_filter_block_4(const masked* block_shares) {
     return 0;
 }
 
@@ -70,7 +70,7 @@ uint4_t shuffled_filter_block_4(const uint4_t* block) {
  * \param[in]      block_shares: The masked input block
  * \return         The masked filter function output
  */
-packed masked_shuffled_filter_block_4(const packed* block_shares) {
+masked masked_shuffled_filter_block_4(const masked* block_shares) {
     return 0;
 }
 

@@ -7,8 +7,8 @@
 #include "keystream.h"
 
 void encrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng**, int);
-void masked_encrypt(packed*, const packed*, const packed*, const rng**, int);
+void masked_encrypt(masked*, const masked*, const masked*, const rng**, int);
 void decrypt(uint4_t*, const uint4_t*, const uint4_t*, const rng**, int);
-void masked_decrypt(packed*, const packed*, const packed*, const rng**, int);
+void masked_decrypt(masked*, const masked*, const masked*, const rng**, int);
 
 #endif

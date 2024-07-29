@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+/* Constants definitions */
+
 #define KEY_WIDTH_4 256
 #define BLOCK_WIDTH_4 5
 #define KEYROUND_WIDTH_4 60
