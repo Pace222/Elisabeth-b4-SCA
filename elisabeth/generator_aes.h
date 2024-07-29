@@ -7,10 +7,10 @@
 #include "aes.h"
 
 typedef struct {
-    rng r;
-    struct AES_ctx ctx;
-    uint8_t ctr[AES_BLOCKLEN];
-    size_t batch_idx;
+    rng r;                                     /* "Child class" of rng */
+    struct AES_ctx ctx;                        /* AES context */
+    uint8_t ctr[AES_BLOCKLEN];                 /* AES-CTR */
+    size_t batch_idx;                          /* Head inside batch */
 } rng_aes;
 
 void rng_new_aes(rng_aes*, const uint8_t*, int);
