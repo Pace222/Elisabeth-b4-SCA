@@ -46,12 +46,12 @@ void init_null_shares(packed* packed_values, uint4_t* values, size_t length) {
 void generate_masking_random_table() {
     uint32_t r = rand();
     RANDOM_TABLE[0] = shares_from_value(r, 0);
-    reset_counter();
+    reset_masking_counter();
 }
 
 void generate_null_masking_random_table() {
     RANDOM_TABLE[0] = 0;
-    reset_counter();
+    reset_masking_counter();
 }
 
 void generate_shuffling_random_table() {
@@ -75,7 +75,7 @@ void generate_shuffling_random_table() {
     printf("|");
     fflush(stdout);
 
-    reset_counter();
+    reset_masking_counter();
 }
 
 void generate_masking_shuffling_random_table() {
@@ -101,10 +101,10 @@ void generate_masking_shuffling_random_table() {
     printf("|");
     fflush(stdout);
 
-    reset_counter();
+    reset_masking_counter();
 }
 
-void reset_counter() {
+void reset_masking_counter() {
     random_table_idx = 0;
 }
 
