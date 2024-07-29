@@ -1029,7 +1029,6 @@ void setup() {
 
   init_sboxes_4();
   init_sboxes_b4();
-  init_chain((uint8_t *) "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 26);
 
   // Set the trigger PIN
   pinMode(TriggerPQ, OUTPUT);
