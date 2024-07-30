@@ -1,6 +1,10 @@
 import numpy as np
 from math import comb
 
+"""
+Appendix A: Compute the expected number of traces to collect to have at least one witness per key element
+"""
+
 def solve(N: int, n: int):
     P = np.empty((N + 1, N + 1), dtype=np.float64)
     for i in range(N + 1):

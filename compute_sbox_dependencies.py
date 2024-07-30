@@ -1,5 +1,9 @@
 import numpy as np
 
+"""
+Dynamically computes the number of input dependencies of each S-Box
+"""
+
 def solve():
     res = np.zeros((18, 7), dtype=bool)
     x = np.eye(7, dtype=bool)
