@@ -1,15 +1,15 @@
-from typing import List, Tuple
+from ctypes import *
+
+from typing import List, Tuple, Union
 import pickle as pic
-from collections import Counter
 
 import numpy as np
-#import cupy as np
-import matplotlib.pyplot as plt
 import scipy.io as sio
 
 
 import log_parser
 
+# Constant definitions
 KEYROUND_WIDTH_4 = 60
 KEYROUND_WIDTH_B4 = 98
 
@@ -22,20 +22,29 @@ BLOCK_WIDTH_B4 = 7
 HW = [bin(n).count("1") for n in range(0, 128)]
 HD = [[HW[n1 ^ n2] for n2 in range(0, 128)] for n1 in range(0, 128)]
 
-def corr_coef(hypotheses, traces):
-    #Initialize arrays & variables to zero
+def corr_coef(hypotheses: np.ndarray, traces: np.ndarray) -> np.ndarray:
+    """Computes the Pearson correlation coefficient between the consumption model and the observed traces.
+    This function is rather slow because it computes the coefficients iteratively on all traces.
+
+    Args:
+        hypotheses (_type_): Model values according to a certain key hypothesis
+        traces (_type_): Observed traces
+
+    Returns:
+        _type_: Correlation coefficient at every time point
+    """
     num_traces, num_points = traces.shape
     sumnum = np.zeros(num_points)
     sumden1 = np.zeros(num_points)
     sumden2 = np.zeros(num_points)
 
-    #Mean of hypotheses
+    # Mean of hypotheses
     h_mean = np.mean(hypotheses, dtype=np.float64)
 
-    #Mean of all points in trace
+    # Mean of all points in trace
     t_mean = np.mean(traces, axis=0, dtype=np.float64)
 
-    #For each trace, do the following
+    # For each trace, do the following
     for t_idx in range(num_traces):
         h_diff = (hypotheses[t_idx] - h_mean)
         t_diff = traces[t_idx, :] - t_mean
@@ -48,13 +57,23 @@ def corr_coef(hypotheses, traces):
 
     return correlation
 
-def corr_coef_vectorized(hypotheses, traces):
-    h_mean = np.mean(hypotheses, axis=-1) # np.mean(hypotheses)
-    t_mean = np.mean(traces, axis=-2) # np.mean(traces, axis=0)
+def corr_coef_vectorized(hypotheses: np.ndarray, traces: np.ndarray) -> np.ndarray:
+    """Computes the Pearson correlation coefficient between the consumption model and the observed traces.
+    This function is fast because it computes the coefficients in a vectorized way
+
+    Args:
+        hypotheses (_type_): Model values according to a certain key hypothesis
+        traces (_type_): Observed traces
+
+    Returns:
+        _type_: Correlation coefficient at every time point
+    """
+    h_mean = np.mean(hypotheses, axis=-1)
+    t_mean = np.mean(traces, axis=-2)
     h_diff, t_diff = hypotheses - h_mean, traces - t_mean
 
-    r_num = np.sum(h_diff[..., None] * t_diff, axis=-2) # np.sum(h_diff[:, None] * t_diff, axis=0)
-    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=-1) * np.sum(t_diff * t_diff, axis=-2)) # np.sqrt(np.sum(h_diff * h_diff, axis=0) * np.sum(t_diff * t_diff, axis=0))
+    r_num = np.sum(h_diff[..., None] * t_diff, axis=-2)
+    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=-1) * np.sum(t_diff * t_diff, axis=-2))
     r = r_num / r_den
     r = np.clip(r, -1.0, 1.0)
     return r
@@ -82,7 +101,9 @@ s_boxes_b4 = [
 
 s_boxes_b4 = [[s_ & 0x0F for s_ in box] for box in s_boxes_b4]
 
-from ctypes import *
+"""
+C shared library API for Python
+"""
 
 class aes_ctx(Structure):
     _fields_ = [
@@ -124,38 +145,46 @@ class rng_cha(Structure):
 
 lib = CDLL("../elisabeth/py_gen_rng.so")
 
-def aes_random_4(seed: str):
+def aes_random_4(seed: str) -> Tuple[List[int], List[int]]:
     r = rng_aes()
     lib.rng_new_aes(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 1)
     return list(r.r.indices), list(r.r.whitening)
     
-def aes_random_b4(seed: str):
+def aes_random_b4(seed: str) -> Tuple[List[int], List[int]]:
     r = rng_aes()
     lib.rng_new_aes(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
     
-def chacha_random_4(seed: str):
+def chacha_random_4(seed: str) -> Tuple[List[int], List[int]]:
     r = rng_cha()
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 1)
     return list(r.r.indices), list(r.r.whitening)
     
-def chacha_random_b4(seed: str):
+def chacha_random_b4(seed: str) -> Tuple[List[int], List[int]]:
     r = rng_cha()
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
 
+
 def hypothesis_b4_rws_sboxes_location_hw(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
+    """Computes the hypothesis for the `round_idx`/`block_idx` element of the key.
+    We attack the first S-Box round, except for `block_idx` == BLOCK_WIDTH_B4 - 1, where we target the addition manipulating it.
+
+    Args:
+        iv (str): Seed of targeted execution
+        key (List[int]): Key
+        round_idx (int): Targeted round
+        block_idx (int): Targeted block element
+
+    Returns:
+        int: Consumption model's value
+    """
     indices, whitening = chacha_random_b4(iv)
 
+    # Compute corresponding block
     block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
 
-    if block_idx != BLOCK_WIDTH_B4 - 1:
-        if block_idx % 2 == 0:
-            sbox_out = s_boxes_b4[block_idx][block[block_idx]]
-        else:
-            sbox_out = s_boxes_b4[block_idx][(block[block_idx] + block[block_idx - 1]) % 16]
-        return HW[sbox_out]
-    else:
+    if block_idx == BLOCK_WIDTH_B4 - 1:
         for i in range(3):
             block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
         y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
@@ -166,20 +195,31 @@ def hypothesis_b4_rws_sboxes_location_hw(iv: str, key: List[int], round_idx: int
         sbox_out = s_boxes_b4[12][t_0]
 
         return HW[(block[block_idx] + sbox_out) % 16]
+    elif block_idx % 2 == 0:
+        sbox_out = s_boxes_b4[block_idx][block[block_idx]]
+    else:
+        sbox_out = s_boxes_b4[block_idx][(block[block_idx] + block[block_idx - 1]) % 16]
+    return HW[sbox_out]
 
 def hypothesis_b4_rws_sboxes_location_hd(iv: str, key: List[int], round_idx: int, block_idx: int) -> int:
+    """Computes the hypothesis for the `round_idx`/`block_idx` element of the key.
+    We attack the distance between the first S-Box round input and output, except for `block_idx` == BLOCK_WIDTH_B4 - 1,
+    where we target the distance before and after the modulo.
+
+    Args:
+        iv (str): Seed of targeted execution
+        key (List[int]): Key
+        round_idx (int): Targeted round
+        block_idx (int): Targeted block element
+
+    Returns:
+        int: Consumption model's value
+    """
     indices, whitening = chacha_random_b4(iv)
 
     block = [(key[indices[i]] + whitening[i]) % 16 for i in range(BLOCK_WIDTH_B4 * round_idx, BLOCK_WIDTH_B4 * (round_idx + 1))]
 
-    if block_idx != BLOCK_WIDTH_B4 - 1:
-        if block_idx % 2 == 0:
-            sbox_in = block[block_idx]
-        else:
-            sbox_in = (block[block_idx] + block[block_idx - 1]) % 16
-        sbox_out = s_boxes_b4[block_idx][sbox_in]
-        return HD[sbox_in][sbox_out]
-    else:
+    if block_idx == BLOCK_WIDTH_B4 - 1:
         for i in range(3):
             block[2*i + 1] = (block[2*i + 1] + block[2*i]) % 16
         y = [s_boxes_b4[i][block[i]] for i in range(BLOCK_WIDTH_B4 - 1)]
@@ -190,8 +230,27 @@ def hypothesis_b4_rws_sboxes_location_hd(iv: str, key: List[int], round_idx: int
         sbox_out = s_boxes_b4[12][t_0]
 
         return HD[block[block_idx] + sbox_out][(block[block_idx] + sbox_out) % 16]
+    elif block_idx % 2 == 0:
+        sbox_in = block[block_idx]
+    else:
+        sbox_in = (block[block_idx] + block[block_idx - 1]) % 16
+    sbox_out = s_boxes_b4[block_idx][sbox_in]
+    return HD[sbox_in][sbox_out]
 
 def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.ndarray, filename: str) -> np.ndarray:
+    """Finds locations in time for a particular leaking operation by computing the correlation at each timepoint and keeping the maximum.
+    We select a window of size 10 around that point.
+    We use the output of the first S-Box round as hypotheses.
+
+    Args:
+        seeds (np.ndarray): Seeds of the dataset
+        traces (np.ndarray): Traces of the dataset
+        real_keys (np.ndarray): Keys of the dataset
+        filename (str): Filename where to store the locations
+
+    Returns:
+        np.ndarray: Locations in time of leaking operations.
+    """
     correlation_locations = []
     for round_idx in range(len(correlation_locations), KEYROUND_WIDTH_B4 // BLOCK_WIDTH_B4):
         corr_round = []
@@ -201,10 +260,6 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
             corr = corr_coef(hyps, traces.reshape((-1, traces.shape[2])))
             loc = np.argmax(corr)
             corr_round.append(list(range(loc - 5, loc + 5)))
-            #plt.plot(corr)
-            #plt.ylim([-0.5, 0.5])
-            #plt.title(f"Round {round_idx}, Block {block_idx}, Location: {loc}")
-            #plt.show()
         correlation_locations.append(corr_round)
     correlation_locations = np.array(correlation_locations)
 
@@ -213,11 +268,22 @@ def find_locations_in_time(seeds: np.ndarray, traces: np.ndarray, real_keys: np.
 
     return correlation_locations
 
-def load_data(traces_path: str, key_path: str, locations_path: str = "", max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_data(traces_path: str, key_path: str, locations_path: str = "", max_traces: int = None) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Load data from disk
+
+    Args:
+        traces_path (str): Path to the traces file
+        key_path (str): Path to the oscilloscope log file
+        locations_path (str, optional): Optional path to the corelation locations, found with `find_locations_in_time`. Defaults to "".
+        max_traces (int, optional): Optional maximal number of traces to load. Loads all traces if None. Defaults to None.
+
+    Returns:
+        Union[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray, np.ndarray]]: Seeds, traces, keys(, optionally correlation locations)
+    """
     traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
     inputs_outputs, empty_traces = log_parser.parse(key_path)
 
-    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2)]
+    all_keys = [inputs_outputs[i][0][0] for i in range(1, len(inputs_outputs), 2) if i // 2 + 1 not in empty_traces]
     unique_keys = []
     for i, k in enumerate(all_keys):
         if k not in [k for k, i in unique_keys]:
@@ -247,7 +313,17 @@ def load_data(traces_path: str, key_path: str, locations_path: str = "", max_tra
     else:
         return seeds, traces, real_keys
 
-def load_data_alternating_same_varying(traces_path: str, key_path: str, max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def load_data_alternating_same_varying(traces_path: str, key_path: str, max_traces: int = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load data from disk, with two populations of traces/seeds: one with same seeds and one with varying ones, alternating between the two.
+
+    Args:
+        traces_path (str): Path to the traces file
+        key_path (str): Path to the oscilloscope log file
+        max_traces (int, optional): Optional maximal number of traces to load. Loads all traces if None. Defaults to None.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]: Seeds from same seeds, traces from same seeds, seeds from varying seeds, traces from varying seeds, keys
+    """
     traces_dict = sio.loadmat(traces_path, variable_names=[f"data_{i}" for i in range(max_traces)]) if max_traces is not None else sio.loadmat(traces_path)
     inputs_outputs, empty_traces = log_parser.parse(key_path)
 
