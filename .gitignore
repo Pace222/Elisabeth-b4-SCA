@@ -9,7 +9,7 @@ libraries/
 PQ_Kyber/
 crypto_local/
 other_code/
-resnet_models
 
+*.keras
 *.pic
 *.pyc
