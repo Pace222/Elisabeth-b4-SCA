@@ -6,7 +6,8 @@ acquisition/
 build/
 libraries/
 crypto_local/
-resnet_models
+other_code/
 
+*.keras
 *.pic
 *.pyc
