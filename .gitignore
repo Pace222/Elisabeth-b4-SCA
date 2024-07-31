@@ -6,7 +6,6 @@ acquisition/
 build/
 libraries/
 crypto_local/
-other_code/
 
 *.keras
 *.pic
