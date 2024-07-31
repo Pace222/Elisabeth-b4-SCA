@@ -1,6 +1,9 @@
 import numpy as np
 import plotly.express as px
 
+from ctypes import *
+
+# Constant definitions
 KEYROUND_WIDTH_4 = 60
 KEYROUND_WIDTH_B4 = 98
 
@@ -18,7 +21,69 @@ LATEST_ROUND = 1
 
 KEY_ALPHABET = list(range(16))
 
-from ctypes import *
+HW = [bin(n).count("1") for n in range(0, 128)]
+HD = [[HW[n1 ^ n2] for n2 in range(0, 128)] for n1 in range(0, 128)]
+
+def corr_coef(hypotheses: np.ndarray, traces: np.ndarray) -> np.ndarray:
+    """Computes the Pearson correlation coefficient between the consumption model and the observed traces.
+    This function is rather slow because it computes the coefficients iteratively on all traces.
+
+    Args:
+        hypotheses (_type_): Model values according to a certain key hypothesis
+        traces (_type_): Observed traces
+
+    Returns:
+        _type_: Correlation coefficient at every time point
+    """
+    num_traces, num_points = traces.shape
+    sumnum = np.zeros(num_points)
+    sumden1 = np.zeros(num_points)
+    sumden2 = np.zeros(num_points)
+
+    # Mean of hypotheses
+    h_mean = np.mean(hypotheses, dtype=np.float64)
+
+    # Mean of all points in trace
+    t_mean = np.mean(traces, axis=0, dtype=np.float64)
+
+    # For each trace, do the following
+    for t_idx in range(num_traces):
+        h_diff = (hypotheses[t_idx] - h_mean)
+        t_diff = traces[t_idx, :] - t_mean
+
+        sumnum = sumnum + (h_diff * t_diff)
+        sumden1 = sumden1 + h_diff * h_diff 
+        sumden2 = sumden2 + t_diff * t_diff
+
+    correlation = sumnum / np.sqrt(sumden1 * sumden2)
+
+    return correlation
+
+def corr_coef_vectorized(hypotheses: np.ndarray, traces: np.ndarray) -> np.ndarray:
+    """Computes the Pearson correlation coefficient between the consumption model and the observed traces.
+    This function is fast because it computes the coefficients in a vectorized way
+
+    Args:
+        hypotheses (_type_): Model values according to a certain key hypothesis
+        traces (_type_): Observed traces
+
+    Returns:
+        _type_: Correlation coefficient at every time point
+    """
+    h_mean = np.mean(hypotheses, axis=-1)
+    t_mean = np.mean(traces, axis=-2)
+    h_diff, t_diff = hypotheses - h_mean, traces - t_mean
+
+    r_num = np.sum(h_diff[..., None] * t_diff, axis=-2)
+    r_den = np.sqrt(np.sum(h_diff * h_diff, axis=-1) * np.sum(t_diff * t_diff, axis=-2))
+    r = r_num / r_den
+    r = np.clip(r, -1.0, 1.0)
+    return r
+
+
+"""
+C shared library API for Python
+"""
 
 class aes_ctx(Structure):
     _fields_ = [
@@ -79,29 +144,3 @@ def chacha_random_b4(seed: str):
     r = rng_cha()
     lib.rng_new_cha(byref(r), int(seed, 16).to_bytes(length=16, byteorder="little"), 0)
     return list(r.r.indices), list(r.r.whitening)
-
-def plot(line: np.ndarray, name: str, title: str, xaxis_title: str, yaxis_title: str, is_t_test: bool = False, showlegend: bool= True, xaxis: dict = {}, yaxis_range: list = []):
-    fig = px.line(line)
-    fig.for_each_trace(lambda t: t.update(name=name))
-    if is_t_test:
-        fig.add_hline(4.5, line_color="red")
-        fig.add_hline(-4.5, line_color="red")
-
-    fig.update_layout(
-        title={
-            "text": title,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top"
-        },
-        xaxis_title=xaxis_title,
-        yaxis_title=yaxis_title,
-        showlegend=showlegend
-    )
-    if len(xaxis) > 0:
-        fig.update_layout(xaxis=xaxis)
-    if len(yaxis_range) > 0:
-        fig.update_layout(yaxis_range=yaxis_range)
-
-    config = {'scrollZoom': True}
-    fig.show(config=config)
