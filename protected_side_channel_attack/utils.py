@@ -1,6 +1,8 @@
 import numpy as np
 import plotly.express as px
 
+from ctypes import *
+
 # Constant definitions
 KEYROUND_WIDTH_4 = 60
 KEYROUND_WIDTH_B4 = 98
@@ -82,8 +84,6 @@ def corr_coef_vectorized(hypotheses: np.ndarray, traces: np.ndarray) -> np.ndarr
 """
 C shared library API for Python
 """
-
-from ctypes import *
 
 class aes_ctx(Structure):
     _fields_ = [
