@@ -3,12 +3,9 @@
 .venv_linux/
 
 acquisition/
-arduino_test/
 build/
 libraries/
-PQ_Kyber/
 crypto_local/
-other_code/
 resnet_models
 
 *.pic
