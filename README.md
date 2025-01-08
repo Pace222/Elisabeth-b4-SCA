@@ -118,6 +118,4 @@ Hervé Pelletier - herve.pelletier@nagra.com
 
 Serge Vaudenay - serge.vaudenay@epfl.ch
 
-Project Link: [https://github.com/Pace222/PDM-2024](https://github.com/Pace222/PDM-2024)
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
